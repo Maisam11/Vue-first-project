@@ -13,8 +13,7 @@
       :label="column.label"
       :type="column.type"
       :readonly="column.readonly"
-      :width="column.width"
-      :autoFillWidth="true" />
+      :width="column.width" />
   </vue-excel-editor>
 </template>
 

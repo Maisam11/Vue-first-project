@@ -1,27 +1,27 @@
 <template>
-  <v-dialog :value="dialog" max-width="500px" @input="$emit('update:dialog', $event)">
+  <v-dialog :value="dialog" @input="$emit('update:dialog', $event)" max-width="500px">
     <v-card>
       <v-card-title>
-        <span class="headline">{{ localItem && localItem.id ? 'Edit File' : 'Add New File' }}</span>
+        <span class="headline">{{ editedItem && editedItem.id ? 'Edit File' : 'Add New File' }}</span>
       </v-card-title>
       <v-card-text>
-        <v-container>
-          <v-row>
-            <v-col cols="12">
-              <v-text-field
-                :value="localItem.name"
-                @input="$emit('update:editedItem', { ...localItem, name: $event })"
-                label="File Name"
-                required
-              ></v-text-field>
-            </v-col>
-          </v-row>
-        </v-container>
+        <v-text-field
+          v-model="localItem.name"
+          label="File Name"
+          required
+        ></v-text-field>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn color="blue darken-1" text @click="$emit('closeDialog')">Cancel</v-btn>
-        <v-btn color="blue darken-1" text @click="$emit('save', localItem)" id="save-btn-dialog">Save</v-btn>
+        <v-btn
+          color="blue darken-1"
+          text
+          @click="$emit('save', localItem)"
+          :disabled="!localItem.name"
+        >
+          Save
+        </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -31,23 +31,35 @@
 export default {
   name: "FileDialog",
   props: {
-    dialog: {
-      type: Boolean,
-      required: true,
-    },
-    editedItem: {
-      type: Object,
-      default: () => ({}),
-    },
+    dialog: Boolean,
+    editedItem: Object,
   },
   data() {
     return {
-      localItem: { ...this.editedItem },
+      localItem: this.editedItem
+        ? { ...this.editedItem }
+        : {
+            id: String(Date.now()),
+            name: "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            addedBy: "Current User", // Replace with actual user data
+            sheets: [],
+          },
     };
   },
   watch: {
     editedItem(newVal) {
-      this.localItem = { ...newVal };
+      this.localItem = newVal
+        ? { ...newVal }
+        : {
+            id: String(Date.now()),
+            name: "",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            addedBy: "Current User",
+            sheets: [],
+          };
     },
   },
 };

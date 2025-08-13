@@ -29,15 +29,8 @@ export default {
   fetchUsers({ commit, state }) {
     const regularUsers = state.users || [];
     const formUsers = (state.formSubmissions || []).map((sub) => ({
-      id: sub.id,
-      name: sub.name,
-      email: sub.email,
-      dob: sub.dob,
-      age: sub.age,
-      homePhone: sub.homePhone || "--",
-      mobilePhone: sub.mobilePhone || "--",
-      addresses: sub.addresses || [],
-    }));
+      id: sub.id, name: sub.name, email: sub.email, dob: sub.dob, age: sub.age, homePhone: sub.homePhone || "--",
+      mobilePhone: sub.mobilePhone || "--", addresses: sub.addresses || [], }));
     const combinedUsers = [...regularUsers, ...formUsers];
     commit("SET_COMBINED_USERS", combinedUsers);
   },

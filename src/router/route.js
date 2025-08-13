@@ -14,7 +14,6 @@ import FAQComp from "../components/layout/sections/FAQComp.vue";
 import BlogComp from "../components/layout/sections/BlogComp.vue";
 import UserPage from "../components/Pages/UserPage.vue";
 import VueStepper from "../components/Pages/VueStepper.vue";
-// import addAppointment from "../components/Pages/addAppointment.vue";
 
 import UserDashboard from "../components/Pages/UserDashboard.vue";
 import SettingsFile from "../components/Pages/Settings.vue";
