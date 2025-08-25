@@ -5,74 +5,90 @@ import state from './state';
 import mutations from './mutations';
 import actions from './actions';
 import createPersistedState from 'vuex-persistedstate';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
-const isEqual = (obj1, obj2) => {
-  return JSON.stringify(obj1) === JSON.stringify(obj2);
+Vue.use(Vuex);
+
+const createModuleId = (accountId, moduleName) => {
+  return `${accountId}-${moduleName}`;
 };
 
-Vue.use(Vuex);
+const CURRENT_MODULE = {
+  accountId: '78910',
+  moduleName: 'files',
+  fullId: createModuleId('78910', 'files')
+};
 
 const firebaseSyncPlugin = (store) => {
   let isSyncing = false;
 
-  const paths = ['customData', 'steps', 'files'];
-
-  paths.forEach((path) => {
-    const docRef = doc(collection(db, path), 'data');
-    onSnapshot(docRef, (snapshot) => {
-      let data = snapshot.exists() ? snapshot.data().value : null;
-      console.log(`[Firestore] Received data for ${path}:`, data);
-      if (path === 'customData') {
-        data = data ? Object.values(data) : [[]];
-      } else if (path === 'files') {
-        data = data || [];
-      }
-      const mutationName = path === 'customData' ? 'SET_CUSTOM_DATA' : `SET_${path.toUpperCase()}`;
-      if (!isEqual(data, store.state[path])) {
-        isSyncing = true;
-        store.commit(mutationName, data);
-        console.log(`[Firestore] Committed ${mutationName} with data:`, data);
-        isSyncing = false;
-      } else {
-        console.log(`[Firestore] Skipped ${mutationName} as data is unchanged`);
-      }
-    }, (error) => {
-      console.error(`[Firestore] Error fetching ${path}:`, error);
+  const filesCol = collection(db, CURRENT_MODULE.fullId);
+  onSnapshot(filesCol, (snapshot) => {
+    const files = [];
+    snapshot.docs.forEach((docSnap) => {
+      const fileData = { id: docSnap.id, ...docSnap.data() };
+      fileData.sheets = docSnap.data().sheets || [];
+      files.push(fileData);
     });
+    
+    // Only update if files are different
+    const currentFiles = store.state.files;
+    const filesChanged = JSON.stringify(files) !== JSON.stringify(currentFiles);
+    
+    if (filesChanged) {
+      isSyncing = true;
+      store.commit('SET_FILES', files);
+      isSyncing = false;
+    }
+  }, (error) => {
+    console.error(`[Firestore] Error fetching files from ${CURRENT_MODULE.fullId}:`, error);
   });
 
-  store.subscribe((mutation, state) => {
+  store.subscribe((mutation) => {
     if (isSyncing) {
       console.log(`[Firestore] Skipped sync for ${mutation.type} as it was triggered by Firestore`);
       return;
     }
 
-    paths.forEach((path) => {
-      const currentState = state[path];
-      const previousState = store._state?.data?.[path] || null;
-
-      const mutationTriggers = {
-        customData: ['SET_CUSTOM_DATA'],
-        steps: ['SET_STEPS'],
-        files: ['ADD_FILE', 'UPDATE_FILE', 'DELETE_FILE'],
-      };
-
-      if (mutationTriggers[path]?.includes(mutation.type) || !isEqual(currentState, previousState)) {
-        const docRef = doc(collection(db, path), 'data');
-        let dataToSync = JSON.parse(JSON.stringify(currentState));
-        if (path === 'customData') {
-          dataToSync = Object.fromEntries(dataToSync.map((sheet, index) => [index, sheet || []]));
+    if (['ADD_FILE', 'UPDATE_FILE', 'DELETE_FILE'].includes(mutation.type)) {
+      switch (mutation.type) {
+        case 'ADD_FILE':
+        case 'UPDATE_FILE': {
+          const file = mutation.payload;
+          const fileId = file.id;
+          const fileData = { ...file };
+          delete fileData.id;
+          
+          // Store file metadata in module collection
+          setDoc(doc(db, CURRENT_MODULE.fullId, fileId), fileData).catch((error) => {
+            console.error(`[Firestore] Failed to set file ${fileId} in ${CURRENT_MODULE.fullId}:`, error);
+          });
+          break;
         }
-        console.log(`[Firestore] Syncing ${path} to Firestore:`, dataToSync);
-        setDoc(docRef, { value: dataToSync }).catch((error) => {
-          console.error(`[Firestore] Failed to sync ${path}:`, error);
-        });
-      } else {
-        console.log(`[Firestore] Skipped syncing ${path} as state is unchanged`);
+        case 'DELETE_FILE': {
+          const fileId = mutation.payload;
+          
+          // Delete file metadata from module collection
+          deleteDoc(doc(db, CURRENT_MODULE.fullId, fileId)).catch((error) => {
+            console.error(`[Firestore] Failed to delete file ${fileId} from ${CURRENT_MODULE.fullId}:`, error);
+          });
+          
+          // Delete all sheet data in the subcollection
+          const sheetsCol = collection(db, CURRENT_MODULE.fullId, fileId, 'sheets');
+          getDocs(sheetsCol).then((snapshot) => {
+            snapshot.docs.forEach((d) => {
+              deleteDoc(doc(db, CURRENT_MODULE.fullId, fileId, 'sheets', d.id)).catch((error) => {
+                console.error(`[Firestore] Failed to delete sheet data ${d.id}:`, error);
+              });
+            });
+          }).catch((error) => {
+            console.error(`[Firestore] Failed to fetch sheet data for deletion:`, error);
+          });
+          break;
+        }
       }
-    });
+    }
   });
 };
 
@@ -89,3 +105,6 @@ export default new Vuex.Store({
     firebaseSyncPlugin,
   ],
 });
+
+// Export the module system for use in components
+export { createModuleId, CURRENT_MODULE };

@@ -28,6 +28,9 @@ import TableActions from "@/components/custom-columns/TableActions.vue";
 import FileDialog from "@/components/Pages/modals/FileDialog.vue";
 import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
 import * as XLSX from "xlsx";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/firebase';
+import { CURRENT_MODULE } from '@/store/index';
 
 export default {
   name: "FilesPage",
@@ -42,11 +45,11 @@ export default {
         itemsPerPageOptions: [5, 10, 25],
       },
       headers: [
-        { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true, },
-        { text: "Created At", value: "createdAt", width: "200px", filterable: true, },
-        { text: "Updated At", value: "updatedAt", width: "200px", filterable: true, },
-        { text: "Added By", value: "addedBy", width: "200px", filterable: true, },
-        { text: "Actions", value: "actions", sortable: false, align: "center", width: "150px", },
+        { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
+        { text: "Created At", value: "createdAt", width: "200px", filterable: true },
+        { text: "Updated At", value: "updatedAt", width: "200px", filterable: true },
+        { text: "Added By", value: "addedBy", width: "200px", filterable: true },
+        { text: "Actions", value: "actions", sortable: false, align: "center", width: "150px" },
       ],
       alphabeticalColumns: Array.from({ length: 26 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
@@ -62,13 +65,13 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["addFile", "updateFile", "deleteFile", "fetchFiles"]),
+    ...mapActions(["addFile", "updateFile", "deleteFile"]),
     openDialog(item) {
       this.dialogDelete = false;
       this.editedItem = item
         ? { ...item }
         : {
-            id: String(Date.now()),
+            id: this.generateRandomId(),
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -76,6 +79,9 @@ export default {
             sheets: [],
           };
       this.dialog = true;
+    },
+    generateRandomId() {
+      return Math.random().toString(36).substring(2, 10);
     },
     openDeleteDialog(item) {
       this.dialog = false;
@@ -102,35 +108,54 @@ export default {
     viewFile(item) {
       this.$router.push(`/UserDashboard/Files/${item.id}`);
     },
-    downloadAllFiles() {
+    async downloadAllFiles() {
       if (!this.files.length) {
         alert("No files available to download.");
         return;
       }
 
       const wb = XLSX.utils.book_new();
+      let hasData = false;
 
-      this.files.forEach((file, fileIndex) => {
+      for (const file of this.files) {
         const sheets = file.sheets || [];
-        sheets.forEach((sheet, sheetIndex) => {
-          const data = sheet.data || [];
-          const wsData = [
-            this.alphabeticalColumns.map(col => col.title),
-            ...data.map(row =>
-              this.alphabeticalColumns.map(col => row[col.field] || "")
-            ),
-          ];
-          const ws = XLSX.utils.aoa_to_sheet(wsData);
-          const sheetName = `${file.name || `File${fileIndex + 1}`}_${sheet.name || `Sheet${sheetIndex + 1}`}`.slice(0, 31);
-          XLSX.utils.book_append_sheet(wb, ws, sheetName);
-        });
-      });
+        for (const [sheetIndex, sheetName] of sheets.entries()) {
+          try {
+            const sheetDocRef = doc(db, CURRENT_MODULE.fullId, file.id, 'sheets', sheetName);
+            const sheetDoc = await getDoc(sheetDocRef);
+            
+            const data = sheetDoc.exists() ? sheetDoc.data().data || [] : [];
+            
+            if (data.length > 0) {
+              hasData = true;
+              
+              const wsData = [
+                this.alphabeticalColumns.map(col => col.title),
+                ...data.map(row =>
+                  this.alphabeticalColumns.map(col => row[col.field] || "")
+                ),
+              ];
+              
+              const ws = XLSX.utils.aoa_to_sheet(wsData);
+              
+              const sheetNameForExcel = `${file.name || `File${file.id}`}_${sheetName || `Sheet${sheetIndex + 1}`}`.slice(0, 31);
+              XLSX.utils.book_append_sheet(wb, ws, sheetNameForExcel);
+            }
+          } catch (error) {
+            console.error(`Error downloading sheet ${sheetName} for file ${file.id}:`, error);
+          }
+        }
+      }
+
+      if (!hasData) {
+        alert("No data available to download.");
+        return;
+      }
 
       XLSX.writeFile(wb, "AllFiles.xlsx");
     },
   },
   mounted() {
-    this.fetchFiles();
   },
 };
 </script>

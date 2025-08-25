@@ -1,6 +1,3 @@
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-
 export default {
   addUser({ commit }, user) {
     commit("ADD_USER", user);
@@ -26,13 +23,25 @@ export default {
   deleteFormSubmission({ commit }, submissionId) {
     commit("DELETE_FORM_SUBMISSION", submissionId);
   },
-  fetchUsers({ commit, state }) {
-    const regularUsers = state.users || [];
+  fetchUsers({ state }) {
+    const regularUsers = (state.users || []).map((user) => ({
+      ...user,
+      isFormSubmission: false,
+      type: "user",
+    }));
     const formUsers = (state.formSubmissions || []).map((sub) => ({
-      id: sub.id, name: sub.name, email: sub.email, dob: sub.dob, age: sub.age, homePhone: sub.homePhone || "--",
-      mobilePhone: sub.mobilePhone || "--", addresses: sub.addresses || [], }));
-    const combinedUsers = [...regularUsers, ...formUsers];
-    commit("SET_COMBINED_USERS", combinedUsers);
+      id: sub.id,
+      name: sub.name,
+      email: sub.email,
+      dob: sub.dob,
+      age: sub.age,
+      homePhone: sub.homePhone || "--",
+      mobilePhone: sub.mobilePhone || "--",
+      addresses: sub.addresses || [],
+      isFormSubmission: true,
+      type: "form",
+    }));
+    return [...regularUsers, ...formUsers];
   },
   setCustomData({ commit }, data) {
     commit("SET_CUSTOM_DATA", data);
@@ -49,7 +58,14 @@ export default {
   setSelectedRows({ commit }, rows) {
     commit("SET_SELECTED_ROWS", rows);
   },
-  addFile({ commit }, file) {
+  addFile({ commit, state }, file) {
+    if (!file.id) {
+      throw new Error("File ID must be provided");
+    }
+    // Check for duplicate ID
+    if (state.files.some(f => f.id === file.id)) {
+      throw new Error("File ID already exists");
+    }
     commit("ADD_FILE", file);
   },
   updateFile({ commit }, file) {
@@ -57,26 +73,5 @@ export default {
   },
   deleteFile({ commit }, fileId) {
     commit("DELETE_FILE", fileId);
-  },
-  fetchFiles({ commit }) {
-    const docRef = doc(db, 'files', 'data');
-    getDoc(docRef).then((snapshot) => {
-      const data = snapshot.exists() ? snapshot.data().value : [];
-      commit("SET_FILES", data);
-    }).catch((error) => {
-      console.error("[Firestore] Error fetching files:", error);
-    });
-  },
-  fetchFileById({ commit }, fileId) {
-    const docRef = doc(db, 'files', 'data');
-    getDoc(docRef).then((snapshot) => {
-      const data = snapshot.exists() ? snapshot.data().value : [];
-      const file = data.find(f => f.id === fileId);
-      if (file) {
-        commit("SET_FILES", data);
-      }
-    }).catch((error) => {
-      console.error("[Firestore] Error fetching file by id:", error);
-    });
   },
 };

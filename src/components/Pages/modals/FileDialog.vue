@@ -5,23 +5,13 @@
         <span class="headline">{{ editedItem && editedItem.id ? 'Edit File' : 'Add New File' }}</span>
       </v-card-title>
       <v-card-text>
-        <v-text-field
-          v-model="localItem.name"
-          label="File Name"
-          required
-        ></v-text-field>
+        <!-- <v-text-field v-if="editedItem && editedItem.id" v-model="localItem.id" label="File ID" disabled ></v-text-field> -->
+        <v-text-field v-model="localItem.name" label="File Name" required :rules="[v => !!v || 'File Name is required']" ></v-text-field>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
         <v-btn color="blue darken-1" text @click="$emit('closeDialog')">Cancel</v-btn>
-        <v-btn
-          color="blue darken-1"
-          text
-          @click="$emit('save', localItem)"
-          :disabled="!localItem.name"
-        >
-          Save
-        </v-btn>
+        <v-btn color="blue darken-1" text @click="$emit('save', localItem)" :disabled="!localItem.name" > Save </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -39,21 +29,26 @@ export default {
       localItem: this.editedItem
         ? { ...this.editedItem }
         : {
-            id: String(Date.now()),
+            id: this.generateRandomId(),
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            addedBy: "Current User", // Replace with actual user data
+            addedBy: "Current User",
             sheets: [],
           },
     };
+  },
+  methods: {
+    generateRandomId() {
+      return Math.random().toString(36).substring(2, 10);
+    }
   },
   watch: {
     editedItem(newVal) {
       this.localItem = newVal
         ? { ...newVal }
         : {
-            id: String(Date.now()),
+            id: this.generateRandomId(),
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
