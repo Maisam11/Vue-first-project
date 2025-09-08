@@ -7,11 +7,22 @@
       <h2>File Details: {{ localFile.name }}</h2>
       <v-card>
         <v-card-text>
-          <p><strong>File ID:</strong> {{ localFile.id }}</p>
-          <p><strong>File Name:</strong> {{ localFile.name }}</p>
-          <p><strong>Created At:</strong> {{ localFile.createdAt }}</p>
-          <p><strong>Updated At:</strong> {{ localFile.updatedAt }}</p>
-          <p><strong>Added By:</strong> {{ localFile.addedBy }}</p>
+          <v-row>
+            <v-col cols="12" md="6">
+              <h3>File Metadata</h3>
+              <p><strong>File ID:</strong> {{ localFile.id }}</p>
+              <p><strong>File Name:</strong> {{ localFile.name }}</p>
+              <p><strong>Created At:</strong> {{ formatDate(localFile.createdAt) }}</p>
+              <p><strong>Updated At:</strong> {{ formatDate(localFile.updatedAt) }}</p>
+              <p><strong>Added By:</strong> {{ localFile.addedBy }}</p>
+            </v-col>
+            <v-col cols="12" md="6" v-if="localFile.sheets && localFile.sheets.length">
+              <h3>Selected Sheet Metadata</h3>
+              <p><strong>Sheet Name:</strong> {{ localFile.sheets[activeSheetTab]?.name || 'N/A' }}</p>
+              <p><strong>Created At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.createdAt) || 'N/A' }}</p>
+              <p><strong>Updated At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.updatedAt) || 'N/A' }}</p>
+            </v-col>
+          </v-row>
           <h3>Sheets</h3>
           <div class="d-flex mb-4">
             <GenericButton color="primary" icon="mdi-plus" class="mr-2" @click="addNewSheet"> Sheet</GenericButton>
@@ -24,30 +35,30 @@
           </div>
           <v-tabs v-model="activeSheetTab" class="mb-4">
             <v-tab
-              v-for="(sheet, index) in localFile.sheets || []"
-              :key="index"
+              v-for="(sheet, index) in localFile.sheets"
+              :key="sheet.name"
               @dblclick="startEditingSheetName(index)"
               @contextmenu.prevent="openDeleteSheetDialog(index)"
             >
               <template v-if="editingSheetIndex === index">
                 <v-text-field
-                  v-model="editingSheetName" dense hide-details
+                  v-model="newSheetName" dense hide-details
                   :rules="[v => !!v || 'Sheet name is required']"
                   @blur="saveSheetName(index)"
                   @keyup.enter="saveSheetName(index)"
                   @keyup.esc="cancelEditingSheetName"
-                  ref="sheetNameInput" autofocus
+                  :ref="`sheetNameInput-${index}`" autofocus
                 ></v-text-field>
               </template>
               <template v-else>
-                {{ sheet }}
+                {{ sheet.name }}
               </template>
             </v-tab>
           </v-tabs>
           <v-tabs-items v-model="activeSheetTab">
-            <v-tab-item v-for="(sheet, index) in localFile.sheets || []" :key="index">
+            <v-tab-item v-for="(sheet, index) in localFile.sheets" :key="sheet.name">
               <GenericExcelSheet
-                :value="sheetData[index] || []"
+                :value="sheet.data || []"
                 :columns="alphabeticalColumns"
                 :editorRef="`sheetEditor${index}`"
                 :type="`sheet${index}`"
@@ -77,9 +88,6 @@ import GenericButton from "@/components/common/GenericButton.vue";
 import GenericExcelSheet from "@/components/common/GenericExcelSheet.vue";
 import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
 import { mapGetters, mapActions } from "vuex";
-import { getDoc, setDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/firebase';
-import { CURRENT_MODULE } from '@/store/index';
 
 export default {
   name: "FileView",
@@ -93,8 +101,7 @@ export default {
       localFile: null,
       loading: true,
       editingSheetIndex: null,
-      editingSheetName: '',
-      sheetData: [],
+      newSheetName: '',
       alphabeticalColumns: Array.from({ length: 26 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
         title: String.fromCharCode(65 + i),
@@ -104,123 +111,125 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["getFileById"]),
+    ...mapGetters("files", ["getFileById"]),
   },
   methods: {
-    ...mapActions(["updateFile"]),
-    async loadSheetData() {
-      this.sheetData = [];
-      const promises = this.localFile.sheets.map(async (sheet) => {
-        try {
-          const snap = await getDoc(doc(db, CURRENT_MODULE.fullId, this.localFile.id, 'sheets', sheet));
-          return snap.exists() ? snap.data().data || [] : [];
-        } catch (error) {
-          console.error(`Error loading sheet ${sheet}:`, error);
-          return [];
-        }
-      });
-      this.sheetData = await Promise.all(promises);
+    ...mapActions("files", ["updateFile"]),
+    formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     },
     addNewSheet() {
-      const sheetsLength = this.localFile.sheets.length;
+      const sheets = this.localFile.sheets || [];
+      const sheetsLength = sheets.length;
       const newSheetName = `Sheet ${sheetsLength + 1}`;
-      this.localFile.sheets.push(newSheetName);
-      this.sheetData.push([]);
+      const newSheet = {
+        name: newSheetName,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: []
+      };
+      this.localFile.sheets.push(newSheet);
       this.activeSheetTab = sheetsLength;
       this.localFile.updatedAt = new Date().toISOString();
     },
-    updateSheetData(sheetIndex, newData) {
-      this.sheetData[sheetIndex] = newData.map(row => ({
-        ...row,
-        _rowKey: row._rowKey || String(Date.now() + Math.random()),
-      }));
-      this.localFile.updatedAt = new Date().toISOString();
+    updateSheetData(index, newData) {
+      const sheet = this.localFile.sheets[index];
+      if (sheet) {
+        sheet.data = newData.map(row => ({
+          ...row,
+          _rowKey: row._rowKey || String(Date.now() + Math.random()),
+        }));
+        sheet.updatedAt = new Date().toISOString();
+        this.localFile.updatedAt = new Date().toISOString();
+      }
     },
     addRow() {
+      const sheet = this.localFile.sheets[this.activeSheetTab];
+      if (!sheet) return;
       const newRow = {
         _rowKey: String(Date.now() + Math.random()),
       };
       this.alphabeticalColumns.forEach((col) => {
         newRow[col.field] = "";
       });
-      this.sheetData[this.activeSheetTab].push(newRow);
+      sheet.data.push(newRow);
+      sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
     },
     addRowAbove() {
       if (this.selectedRows.length === 0) return;
+      const sheet = this.localFile.sheets[this.activeSheetTab];
+      if (!sheet) return;
       const newRow = {
         _rowKey: String(Date.now() + Math.random()),
       };
       this.alphabeticalColumns.forEach((col) => {
         newRow[col.field] = "";
       });
-      const currentData = this.sheetData[this.activeSheetTab] || [];
+      const currentData = sheet.data || [];
       const selectedIndices = this.selectedRows
         .map(rowKey => currentData.findIndex(row => row._rowKey === rowKey))
         .filter(index => index !== -1)
         .sort((a, b) => a - b);
       const insertIndex = selectedIndices[0];
       currentData.splice(insertIndex, 0, newRow);
+      sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
-        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
-      }
+      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
     },
     addRowBelow() {
       if (this.selectedRows.length === 0) return;
+      const sheet = this.localFile.sheets[this.activeSheetTab];
+      if (!sheet) return;
       const newRow = {
         _rowKey: String(Date.now() + Math.random()),
       };
       this.alphabeticalColumns.forEach((col) => {
         newRow[col.field] = "";
       });
-      const currentData = this.sheetData[this.activeSheetTab] || [];
+      const currentData = sheet.data || [];
       const selectedIndices = this.selectedRows
         .map(rowKey => currentData.findIndex(row => row._rowKey === rowKey))
         .filter(index => index !== -1)
         .sort((a, b) => a - b);
       const insertIndex = selectedIndices[selectedIndices.length - 1] + 1;
       currentData.splice(insertIndex, 0, newRow);
+      sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
-        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
-      }
+      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
     },
-    handleRowSelection(sheetIndex, selected) {
-      const currentData = this.sheetData[sheetIndex] || [];
+    handleRowSelection(index, selected) {
+      const sheet = this.localFile.sheets[index];
+      const currentData = sheet.data || [];
       this.selectedRows = selected
-        .filter(index => index >= 0 && index < currentData.length)
-        .map(index => currentData[index]._rowKey);
+        .filter(idx => idx >= 0 && idx < currentData.length)
+        .map(idx => currentData[idx]._rowKey);
     },
     deleteSelectedRows() {
       if (this.selectedRows.length === 0) return;
-      const currentData = this.sheetData[this.activeSheetTab] || [];
+      const sheet = this.localFile.sheets[this.activeSheetTab];
+      if (!sheet) return;
+      const currentData = sheet.data || [];
       const newData = currentData.filter(
         row => !this.selectedRows.includes(row._rowKey)
       );
-      this.sheetData[this.activeSheetTab] = newData;
+      sheet.data = newData;
+      sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
-        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
-      }
+      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
     },
-    openDeleteSheetDialog(sheetIndex) {
-      this.sheetToDelete = sheetIndex;
+    openDeleteSheetDialog(index) {
+      this.sheetToDelete = index;
       this.dialogDeleteSheet = true;
     },
     deleteSheetConfirm() {
-      const deletedSheetName = this.localFile.sheets[this.sheetToDelete];
       this.localFile.sheets.splice(this.sheetToDelete, 1);
-      this.sheetData.splice(this.sheetToDelete, 1);
-      
-      deleteDoc(doc(db, CURRENT_MODULE.fullId, this.localFile.id, 'sheets', deletedSheetName)).catch((error) => {
-        console.error(`[Firestore] Failed to delete sheet data ${deletedSheetName}:`, error);
-      });
-      
       if (this.activeSheetTab >= this.localFile.sheets.length && this.localFile.sheets.length > 0) {
         this.activeSheetTab = this.localFile.sheets.length - 1;
       } else if (this.localFile.sheets.length === 0) {
@@ -235,68 +244,46 @@ export default {
     },
     startEditingSheetName(index) {
       this.editingSheetIndex = index;
-      this.editingSheetName = this.localFile.sheets[index];
+      this.newSheetName = this.localFile.sheets[index].name;
       this.$nextTick(() => {
-        if (this.$refs.sheetNameInput) {
-          this.$refs.sheetNameInput.focus();
+        if (this.$refs[`sheetNameInput-${index}`]) {
+          this.$refs[`sheetNameInput-${index}`][0].focus();
         }
       });
     },
     saveSheetName(index) {
-      if (this.editingSheetName.trim()) {
-        const oldName = this.localFile.sheets[index];
-        this.localFile.sheets[index] = this.editingSheetName.trim();
+      if (this.newSheetName.trim()) {
+        this.localFile.sheets[index].name = this.newSheetName.trim();
+        this.localFile.sheets[index].updatedAt = new Date().toISOString();
         this.localFile.updatedAt = new Date().toISOString();
-        
-        const oldDoc = doc(db, CURRENT_MODULE.fullId, this.localFile.id, 'sheets', oldName);
-        const newDoc = doc(db, CURRENT_MODULE.fullId, this.localFile.id, 'sheets', this.editingSheetName.trim());
-        
-        getDoc(oldDoc).then((snap) => {
-          if (snap.exists()) {
-            setDoc(newDoc, snap.data()).then(() => {
-              deleteDoc(oldDoc);
-            });
-          }
-        }).catch((error) => {
-          console.error(`[Firestore] Failed to rename sheet from ${oldName} to ${this.editingSheetName.trim()}:`, error);
-        });
       }
       this.editingSheetIndex = null;
-      this.editingSheetName = '';
+      this.newSheetName = '';
     },
     cancelEditingSheetName() {
       this.editingSheetIndex = null;
-      this.editingSheetName = '';
+      this.newSheetName = '';
     },
     async saveChanges() {
-      const metadata = {
-        ...this.localFile,
-        sheets: this.localFile.sheets,
-      };
-      this.updateFile(metadata);
-      
-      for (let i = 0; i < this.localFile.sheets.length; i++) {
-        const sheetName = this.localFile.sheets[i];
-        const data = this.sheetData[i];
-        if (data && data.length) {
-          await setDoc(doc(db, CURRENT_MODULE.fullId, this.localFile.id, 'sheets', sheetName), { data: data }).catch((error) => {
-            console.error(`[Firestore] Failed to set sheet data ${sheetName}:`, error);
-          });
-        }
-      }
+      await this.updateFile({ ...this.localFile });
+    },
+    generateRandomId() {
+      return Math.random().toString(36).substring(2, 10);
     },
   },
   async mounted() {
     this.loading = true;
-    this.localFile = this.getFileById(this.$route.params.id) || null;
-    if (this.localFile) {
-      this.localFile = {
-        ...this.localFile,
-        sheets: this.localFile.sheets || [],
-      };
-      await this.loadSheetData();
+    try {
+      this.localFile = await this.$store.dispatch('firebase/getById', { id: this.$route.params.id }, { root: true });
+      if (!this.localFile) {
+        this.localFile = null;
+      }
+    } catch (error) {
+      console.error('Error fetching file:', error);
+      this.localFile = null;
+    } finally {
+      this.loading = false;
     }
-    this.loading = false;
   },
 };
 </script>

@@ -1,19 +1,99 @@
 <template>
-  <div style="margin: 1rem 2.1rem 0 1rem;">
-    <GenericDataTable :headers="headers" :items="files" title="Files Table" :footerProps="footerProps" :showExpand="false" >
+  <div style="margin: 1rem 2.1rem 5rem 1rem;">
+    <GenericDataTable 
+      :headers="headers" 
+      :items="paginatedFiles" 
+      title="Files Table" 
+      :showExpand="true"
+      :loading="loading"
+      hide-default-footer
+    >
       <template v-slot:toolbar-actions>
-        <div class="d-flex mb-4">
-          <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn" > File</GenericButton>
-          <GenericButton color="success" background icon="mdi-download" @click="downloadAllFiles" :disabled="!files.length"
-            id="download-files-btn" > Excel</GenericButton>
+        <div class="d-flex mb-4 align-center flex-wrap">
+          <div class="d-flex align-center">
+            <v-menu v-model="startDateMenu" offset-y >
+              <template v-slot:activator="{ on, attrs }">
+                <v-text-field v-model="startDate" placeholder="Start Date" readonly v-bind="attrs" v-on="on" dense outlined
+                  style="max-width: 110px; height: 35px; margin-right: 0.3rem;" ></v-text-field>
+              </template>
+              <v-date-picker
+                v-model="startDate"
+                @input="startDateMenu = false"
+              ></v-date-picker>
+            </v-menu>
+            <v-menu v-model="endDateMenu" offset-y >
+              <template v-slot:activator="{ on, attrs }">
+                <v-text-field v-model="endDate" placeholder="End Date" readonly v-bind="attrs" v-on="on" dense outlined
+                   style="max-width: 110px; height: 35px; margin-right: 0.3rem;" ></v-text-field>
+              </template>
+              <v-date-picker
+                v-model="endDate"
+                @input="endDateMenu = false"
+              ></v-date-picker>
+            </v-menu>
+            <GenericButton color="primary" @click="applyDateFilter" :loading="filterLoading" style="margin-right: 0.3rem;">
+              Filter </GenericButton>
+            <GenericButton color="secondary" @click="clearDateFilter" v-if="startDate || endDate" style="margin-right: 0.3rem;">
+              Reset </GenericButton>
+          </div>
+          <div class="d-flex">
+            <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn"> 
+              File </GenericButton>
+            <GenericButton color="success" background icon="mdi-download" @click="downloadAllFiles" :disabled="paginatedFiles.length === 0"
+              id="download-files-btn"> 
+              Excel </GenericButton>
+          </div>
         </div>
       </template>
-
+      <template v-slot:expanded-item="{ headers, item }">
+        <td :colspan="headers.length">
+          <v-list>
+            <v-list-item v-for="sheet in item.sheets" :key="sheet.name" @click="viewSheet(item.id, sheet.name)">
+              <v-list-item-content>
+                <v-list-item-title>{{ sheet.name }}</v-list-item-title>
+                <v-list-item-subtitle>
+                  Created: {{ formatDate(sheet.createdAt) }} | Updated: {{ formatDate(sheet.updatedAt) }}
+                </v-list-item-subtitle>
+              </v-list-item-content>
+            </v-list-item>
+          </v-list>
+        </td>
+      </template>
+      <template v-slot:column-createdAt="{ item }">
+        {{ formatDate(item.createdAt) }}
+      </template>
+      <template v-slot:column-updatedAt="{ item }">
+        {{ formatDate(item.updatedAt) }}
+      </template>
       <template v-slot:column-actions="{ item }">
         <TableActions :item="item" :onEdit="openDialog" :onView="viewFile" :onDelete="openDeleteDialog" />
       </template>
     </GenericDataTable>
-
+    <v-card>
+      <v-card-text class="pa-3">
+        <div class="d-flex justify-space-between align-center">
+          <span class="text-caption">
+            Showing {{ pagination.startIndex + 1 }} to {{ pagination.endIndex }} of {{ filteredFiles.length }} files
+          </span>
+          <div class="d-flex align-center">
+            <span class="text-caption mr-2">Rows per page:</span>
+            <v-select
+              v-model="pagination.itemsPerPage"
+              :items="itemsPerPageOptions"
+              dense outlined hide-details
+              style="max-width: 80px;"
+              @change="resetPagination"
+            ></v-select>
+            <v-pagination
+              v-model="pagination.currentPage"
+              :length="pagination.totalPages"
+              :total-visible="10"
+              class="ml-4" color="primary"
+            ></v-pagination>
+          </div>
+        </div>
+      </v-card-text>
+    </v-card>
     <FileDialog :dialog="dialog" :editedItem="editedItem" @update:dialog="dialog = $event" @update:editedItem="editedItem = $event"
       @save="saveFile" @closeDialog="closeDialog" />
     <DeleteDialog :dialog="dialogDelete" @confirm="deleteFileConfirm" @closeDialog="closeDialog" />
@@ -28,9 +108,6 @@ import TableActions from "@/components/custom-columns/TableActions.vue";
 import FileDialog from "@/components/Pages/modals/FileDialog.vue";
 import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
 import * as XLSX from "xlsx";
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/firebase';
-import { CURRENT_MODULE } from '@/store/index';
 
 export default {
   name: "FilesPage",
@@ -40,14 +117,26 @@ export default {
       dialog: false,
       dialogDelete: false,
       editedItem: null,
-      footerProps: {
-        showFirstLastPage: true,
-        itemsPerPageOptions: [5, 10, 25],
+      loading: false,
+      filterLoading: false,
+      startDateMenu: false,
+      endDateMenu: false,
+      startDate: null,
+      endDate: null,
+      pagination: {
+        currentPage: 1,
+        itemsPerPage: 10,
+        totalPages: 1,
+        startIndex: 0,
+        endIndex: 0
       },
+      itemsPerPageOptions: [5, 10, 15, 20, 25],
+      filteredFiles: [],
       headers: [
+        { text: "", value: "data-table-expand", width: "50px" },
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
-        { text: "Created At", value: "createdAt", width: "200px", filterable: true },
-        { text: "Updated At", value: "updatedAt", width: "200px", filterable: true },
+        { text: "Created At", value: "createdAt", width: "200px", filterable: true, sortable: true },
+        { text: "Updated At", value: "updatedAt", width: "200px", filterable: true, sortable: true },
         { text: "Added By", value: "addedBy", width: "200px", filterable: true },
         { text: "Actions", value: "actions", sortable: false, align: "center", width: "150px" },
       ],
@@ -59,24 +148,71 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["getFiles"]),
-    files() {
-      return this.getFiles;
+    ...mapGetters("files", ["getFiles", "getFilteredFiles"]),
+    paginatedFiles() {
+      const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
+      const end = start + this.pagination.itemsPerPage;
+      return this.getFilteredFiles.slice(start, end);
     },
   },
+  watch: {
+    'pagination.currentPage': function() {
+      this.updatePaginationIndices();
+    },
+    'pagination.itemsPerPage': function() {
+      this.resetPagination();
+    }
+  },
   methods: {
-    ...mapActions(["addFile", "updateFile", "deleteFile"]),
+    ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFilteredFiles", "getPaginatedFiles", "startFileSync"]),
+    formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    },
+    async applyDateFilter() {
+      this.loading = true;
+      this.filterLoading = true;
+      try {
+        await this.fetchFilteredFiles({ startDate: this.startDate, endDate: this.endDate });
+        this.resetPagination();
+      } catch (error) {
+        console.error('Error filtering files:', error);
+        this.$store.commit('files/SET_FILTERED_FILES', []);
+      } finally {
+        this.loading = false;
+        this.filterLoading = false;
+      }
+    },
+    clearDateFilter() {
+      this.startDate = null;
+      this.endDate = null;
+      this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
+      this.resetPagination();
+    },
+    resetPagination() {
+      this.pagination.currentPage = 1;
+      this.pagination.totalPages = Math.ceil(this.getFilteredFiles.length / this.pagination.itemsPerPage);
+      this.updatePaginationIndices();
+    },
+    updatePaginationIndices() {
+      this.pagination.startIndex = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
+      this.pagination.endIndex = Math.min(
+        this.pagination.startIndex + this.pagination.itemsPerPage,
+        this.getFilteredFiles.length
+      );
+    },
     openDialog(item) {
       this.dialogDelete = false;
       this.editedItem = item
-        ? { ...item }
+        ? { ...item, sheets: item.sheets || [] }
         : {
             id: this.generateRandomId(),
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             addedBy: "Maisam Ali",
-            sheets: [],
+            sheets: []
           };
       this.dialog = true;
     },
@@ -89,7 +225,7 @@ export default {
       this.dialogDelete = true;
     },
     saveFile(file) {
-      if (this.files.find((f) => f.id === file.id)) {
+      if (this.getFiles.find((f) => f.id === file.id)) {
         this.updateFile({ ...file, updatedAt: new Date().toISOString() });
       } else {
         this.addFile(file);
@@ -108,54 +244,51 @@ export default {
     viewFile(item) {
       this.$router.push(`/UserDashboard/Files/${item.id}`);
     },
+    viewSheet(fileId, sheetName) {
+      this.$router.push(`/UserDashboard/Files/${fileId}/${sheetName}`);
+    },
     async downloadAllFiles() {
-      if (!this.files.length) {
+      if (!this.paginatedFiles.length) {
         alert("No files available to download.");
         return;
       }
-
       const wb = XLSX.utils.book_new();
       let hasData = false;
-
-      for (const file of this.files) {
+      for (const file of this.paginatedFiles) {
         const sheets = file.sheets || [];
-        for (const [sheetIndex, sheetName] of sheets.entries()) {
-          try {
-            const sheetDocRef = doc(db, CURRENT_MODULE.fullId, file.id, 'sheets', sheetName);
-            const sheetDoc = await getDoc(sheetDocRef);
-            
-            const data = sheetDoc.exists() ? sheetDoc.data().data || [] : [];
-            
-            if (data.length > 0) {
-              hasData = true;
-              
-              const wsData = [
-                this.alphabeticalColumns.map(col => col.title),
-                ...data.map(row =>
-                  this.alphabeticalColumns.map(col => row[col.field] || "")
-                ),
-              ];
-              
-              const ws = XLSX.utils.aoa_to_sheet(wsData);
-              
-              const sheetNameForExcel = `${file.name || `File${file.id}`}_${sheetName || `Sheet${sheetIndex + 1}`}`.slice(0, 31);
-              XLSX.utils.book_append_sheet(wb, ws, sheetNameForExcel);
-            }
-          } catch (error) {
-            console.error(`Error downloading sheet ${sheetName} for file ${file.id}:`, error);
+        for (const sheet of sheets) {
+          if (sheet.data && sheet.data.length > 0) {
+            hasData = true;
+            const wsData = [
+              this.alphabeticalColumns.map(col => col.title),
+              ...sheet.data.map(row =>
+                this.alphabeticalColumns.map(col => row[col.field] || "")
+              ),
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const sheetNameForExcel = `${file.name || `File${file.id}`}_${sheet.name}`.slice(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetNameForExcel);
           }
         }
       }
-
       if (!hasData) {
         alert("No data available to download.");
         return;
       }
-
-      XLSX.writeFile(wb, "AllFiles.xlsx");
+      XLSX.writeFile(wb, "FilteredFiles.xlsx");
     },
   },
-  mounted() {
+  async mounted() {
+    this.loading = true;
+    try {
+      await this.startFileSync();
+      await this.fetchFilteredFiles({ startDate: null, endDate: null });
+      this.resetPagination();
+    } catch (error) {
+      console.error('Error initializing files:', error);
+    } finally {
+      this.loading = false;
+    }
   },
 };
 </script>

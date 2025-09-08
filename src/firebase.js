@@ -13,7 +13,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const firebaseConnector = getFirestore(app);
 console.log('[Firebase] Initialized with config:', firebaseConfig);
 
-export { db, app };
+export { firebaseConnector, app };

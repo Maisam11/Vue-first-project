@@ -1,3 +1,4 @@
+// src/store/getters.js
 export default {
   getUsers: (state) => state.users,
   getUserById: (state) => (id) => state.users.find((user) => user.id === id),
@@ -30,6 +31,4 @@ export default {
   getExcelSubTab: (state) => state.excelSubTab,
   getSelectedRows: (state) => state.selectedRows,
   getCurrentStepData: (state) => Object.fromEntries(state.customData.map((data, index) => [index, data])),
-  getFiles: (state) => state.files,
-  getFileById: (state) => (id) => state.files.find((file) => file.id === id),
 };

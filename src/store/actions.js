@@ -58,20 +58,4 @@ export default {
   setSelectedRows({ commit }, rows) {
     commit("SET_SELECTED_ROWS", rows);
   },
-  addFile({ commit, state }, file) {
-    if (!file.id) {
-      throw new Error("File ID must be provided");
-    }
-    // Check for duplicate ID
-    if (state.files.some(f => f.id === file.id)) {
-      throw new Error("File ID already exists");
-    }
-    commit("ADD_FILE", file);
-  },
-  updateFile({ commit }, file) {
-    commit("UPDATE_FILE", file);
-  },
-  deleteFile({ commit }, fileId) {
-    commit("DELETE_FILE", fileId);
-  },
 };

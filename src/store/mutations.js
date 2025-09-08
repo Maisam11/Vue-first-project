@@ -1,3 +1,4 @@
+// src/store/mutations.js
 import Vue from "vue";
 export default {
   ADD_USER(state, user) {
@@ -41,20 +42,5 @@ export default {
   },
   SET_COMBINED_USERS(state, combinedUsers) {
     state.combinedUsers = combinedUsers;
-  },
-  ADD_FILE(state, file) {
-    state.files.push({ ...file });
-  },
-  UPDATE_FILE(state, updatedFile) {
-    const index = state.files.findIndex((f) => f.id === updatedFile.id);
-    if (index !== -1) {
-      Vue.set(state.files, index, updatedFile);
-    }
-  },
-  DELETE_FILE(state, fileId) {
-    state.files = state.files.filter((file) => file.id !== fileId);
-  },
-  SET_FILES(state, files) {
-    state.files = files;
   },
 };

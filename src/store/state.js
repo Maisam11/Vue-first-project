@@ -1,3 +1,4 @@
+// src/store/state.js
 export default {
   users: [],
   formSubmissions: [],
@@ -6,5 +7,4 @@ export default {
   steps: [{ name: "Sheet 1", isEditing: false }],
   excelSubTab: 0,
   selectedRows: [],
-  files: [],
 };
