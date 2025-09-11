@@ -31,7 +31,7 @@
                 @input="endDateMenu = false"
               ></v-date-picker>
             </v-menu>
-            <GenericButton color="primary" @click="applyDateFilter" :loading="filterLoading" style="margin-right: 0.3rem;">
+            <GenericButton color="primary" @click="applyDateFilter" style="margin-right: 0.3rem;">
               Filter </GenericButton>
             <GenericButton color="secondary" @click="clearDateFilter" v-if="startDate || endDate" style="margin-right: 0.3rem;">
               Reset </GenericButton>
@@ -39,7 +39,7 @@
           <div class="d-flex">
             <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn"> 
               File </GenericButton>
-            <GenericButton color="success" background icon="mdi-download" @click="downloadAllFiles" :disabled="paginatedFiles.length === 0"
+            <GenericButton color="success" background icon="mdi-download" @click="downloadAllFiles" :disabled="getFilteredFiles.length === 0"
               id="download-files-btn"> 
               Excel </GenericButton>
           </div>
@@ -73,7 +73,7 @@
       <v-card-text class="pa-3">
         <div class="d-flex justify-space-between align-center">
           <span class="text-caption">
-            Showing {{ pagination.startIndex + 1 }} to {{ pagination.endIndex }} of {{ filteredFiles.length }} files
+            Showing {{ pagination.startIndex + 1 }} to {{ pagination.endIndex }} of {{ getFilteredFiles.length }} files
           </span>
           <div class="d-flex align-center">
             <span class="text-caption mr-2">Rows per page:</span>
@@ -118,7 +118,6 @@ export default {
       dialogDelete: false,
       editedItem: null,
       loading: false,
-      filterLoading: false,
       startDateMenu: false,
       endDateMenu: false,
       startDate: null,
@@ -131,7 +130,6 @@ export default {
         endIndex: 0
       },
       itemsPerPageOptions: [5, 10, 15, 20, 25],
-      filteredFiles: [],
       headers: [
         { text: "", value: "data-table-expand", width: "50px" },
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
@@ -164,25 +162,33 @@ export default {
     }
   },
   methods: {
-    ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFilteredFiles", "getPaginatedFiles", "startFileSync"]),
+    ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFiles"]),
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     },
-    async applyDateFilter() {
-      this.loading = true;
-      this.filterLoading = true;
-      try {
-        await this.fetchFilteredFiles({ startDate: this.startDate, endDate: this.endDate });
-        this.resetPagination();
-      } catch (error) {
-        console.error('Error filtering files:', error);
-        this.$store.commit('files/SET_FILTERED_FILES', []);
-      } finally {
-        this.loading = false;
-        this.filterLoading = false;
+    applyDateFilter() {
+      let filteredFiles = this.getFiles;
+      if (this.startDate || this.endDate) {
+        filteredFiles = this.getFiles.filter(file => {
+          const fileDate = new Date(file.createdAt);
+          let isInRange = true;
+          if (this.startDate) {
+            const start = new Date(this.startDate);
+            start.setHours(0, 0, 0, 0);
+            isInRange = isInRange && fileDate >= start;
+          }
+          if (this.endDate) {
+            const end = new Date(this.endDate);
+            end.setHours(23, 59, 59, 999);
+            isInRange = isInRange && fileDate <= end;
+          }
+          return isInRange;
+        });
       }
+      this.$store.commit('files/SET_FILTERED_FILES', filteredFiles);
+      this.resetPagination();
     },
     clearDateFilter() {
       this.startDate = null;
@@ -248,13 +254,13 @@ export default {
       this.$router.push(`/UserDashboard/Files/${fileId}/${sheetName}`);
     },
     async downloadAllFiles() {
-      if (!this.paginatedFiles.length) {
+      if (!this.getFilteredFiles.length) {
         alert("No files available to download.");
         return;
       }
       const wb = XLSX.utils.book_new();
       let hasData = false;
-      for (const file of this.paginatedFiles) {
+      for (const file of this.getFilteredFiles) {
         const sheets = file.sheets || [];
         for (const sheet of sheets) {
           if (sheet.data && sheet.data.length > 0) {
@@ -281,11 +287,10 @@ export default {
   async mounted() {
     this.loading = true;
     try {
-      await this.startFileSync();
-      await this.fetchFilteredFiles({ startDate: null, endDate: null });
-      this.resetPagination();
+      await this.fetchFiles();
+      this.applyDateFilter();
     } catch (error) {
-      console.error('Error initializing files:', error);
+      console.error('Error fetching files:', error);
     } finally {
       this.loading = false;
     }

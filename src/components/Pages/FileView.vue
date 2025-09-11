@@ -87,7 +87,7 @@
 import GenericButton from "@/components/common/GenericButton.vue";
 import GenericExcelSheet from "@/components/common/GenericExcelSheet.vue";
 import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
-import { mapGetters, mapActions } from "vuex";
+import { mapActions } from "vuex";
 
 export default {
   name: "FileView",
@@ -102,19 +102,16 @@ export default {
       loading: true,
       editingSheetIndex: null,
       newSheetName: '',
-      alphabeticalColumns: Array.from({ length: 26 }, (_, i) => ({
+      alphabeticalColumns: Array.from({ length: 7 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
         title: String.fromCharCode(65 + i),
         type: "string",
-        width: "160px",
+        width: "169px",
       })),
     };
   },
-  computed: {
-    ...mapGetters("files", ["getFileById"]),
-  },
   methods: {
-    ...mapActions("files", ["updateFile"]),
+    ...mapActions("files", ["updateFile", "getFileById"]),
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
@@ -274,7 +271,7 @@ export default {
   async mounted() {
     this.loading = true;
     try {
-      this.localFile = await this.$store.dispatch('firebase/getById', { id: this.$route.params.id }, { root: true });
+      this.localFile = await this.getFileById(this.$route.params.id);
       if (!this.localFile) {
         this.localFile = null;
       }

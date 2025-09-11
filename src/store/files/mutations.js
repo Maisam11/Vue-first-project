@@ -18,9 +18,11 @@ export default {
   },
   SET_FILES(state, files) {
     state.files = files;
-    state.filteredFiles = [...files];
   },
   SET_FILTERED_FILES(state, files) {
     state.filteredFiles = files;
+  },
+  SET_SYNCED(state, val) {
+    state.synced = val;
   },
 };
