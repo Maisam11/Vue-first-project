@@ -27,8 +27,8 @@
       <v-card-actions>
         <GenericButton color="primary" background @click="closeDialog">Cancel</GenericButton>
         <GenericButton color="success" background @click="save" id="save-btn-dailog" :loading="isLoading">
-  Save
-</GenericButton>
+          Save
+        </GenericButton>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -39,8 +39,24 @@ import GenericButton from "@/components/common/GenericButton.vue";
 import GenericTextField from "@/components/common/GenericTextField.vue";
 
 export default {
-  components: { GenericButton, GenericTextField},
-  props: ["dialog", "editedItem"],
+  components: { GenericButton, GenericTextField },
+  props: {
+    dialog: {
+      type: Boolean,
+      required: true,
+    },
+    editedItem: {
+      type: Object,
+      default: () => ({
+        id: null,
+        name: "",
+        email: "",
+        dob: "",
+        age: "",
+        addresses: [],
+      }),
+    },
+  },
   data() {
     return {
       localDialog: this.dialog,
@@ -61,12 +77,21 @@ export default {
   },
   methods: {
     save() {
-    this.isLoading = true;
-    setTimeout(() => {
-      this.isLoading = false;
-      this.$emit("save", this.localEditedItem);
-      this.$emit("update:dialog", false);
-    }, 1000);
+      this.isLoading = true;
+      // Ensure localEditedItem has all required fields
+      const userData = {
+        id: this.localEditedItem.id || String(Date.now()),
+        name: this.localEditedItem.name || "",
+        email: this.localEditedItem.email || "",
+        dob: this.localEditedItem.dob || "",
+        age: this.localEditedItem.age || "",
+        addresses: this.localEditedItem.addresses || [],
+      };
+      setTimeout(() => {
+        this.isLoading = false;
+        this.$emit("save", userData);
+        this.$emit("update:dialog", false);
+      }, 1000);
     },
     closeDialog() {
       this.$emit("closeDialog");

@@ -33,7 +33,7 @@ import { mapGetters, mapActions } from "vuex";
 export default {
   name: "StepperComp",
   computed: {
-    ...mapGetters(["getSteps", "getExcelSubTab", "getCustomData"]),
+    ...mapGetters("excel", ["getSteps", "getExcelSubTab", "getCustomData"]),
     steps() {
       return this.getSteps;
     },
@@ -42,7 +42,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["setSteps", "setExcelSubTab", "setCustomData"]),
+    ...mapActions("excel", ["setSteps", "setExcelSubTab", "setCustomData"]),
     addNewStep() {
       const newStepName = `Step ${this.steps.length + 1}`;
       const newSteps = [...this.steps, { name: newStepName, isEditing: false }];

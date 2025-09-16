@@ -51,7 +51,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["getCurrentStepData", "getSteps", "getExcelSubTab", "getSelectedRows", "getCustomData"]),
+    ...mapGetters("excel", ["getCurrentStepData", "getSteps", "getExcelSubTab", "getSelectedRows", "getCustomData"]),
     currentStepData() {
       return this.getCurrentStepData;
     },
@@ -78,7 +78,7 @@ export default {
     },
   },
   methods: {
-    ...mapActions(["setExcelSubTab", "setSelectedRows", "setCustomData", "setCustomColumns"]),
+    ...mapActions("excel", ["setExcelSubTab", "setSelectedRows", "setCustomData", "setCustomColumns"]),
     debounceSave() {
       if (this.saveTimeout) clearTimeout(this.saveTimeout);
       this.saveTimeout = setTimeout(() => {

@@ -96,7 +96,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions(['addFormSubmission', 'updateFormSubmission']),
+    ...mapActions('users', ['addFormSubmission', 'updateFormSubmission']),
     async submitForm() {
       try {
         this.loading = true;
@@ -128,7 +128,6 @@ export default {
         }
         
         this.resetForm();
-        // Removed this.$router.push('/users') to stay on the form page
       } catch (error) {
         const errorMessage = error.message || 'An error occurred while submitting the form';
         if (this.$toast) {

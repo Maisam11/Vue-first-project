@@ -1,6 +1,6 @@
 <template>
   <div class="d-flex justify-end mb-4" style="margin-inline: 1rem;">
-    <div v-if="selectedRows.length > 0">
+    <div v-if="(selectedRows || []).length > 0">
       <GenericButton @click="addRows('above')" icon="mdi-arrow-up blue--text" id="add-above-row-btn" class="mr-2"
         tooltip="Add Above" />
 
@@ -11,7 +11,7 @@
         tooltip="Delete Row" />
     </div>
 
-    <GenericButton v-if="selectedRows.length === 0" @click="addExcelRow" icon="mdi-plus-box-outline blue--text" id="add-row-btn"
+    <GenericButton v-if="(selectedRows || []).length === 0" @click="addExcelRow" icon="mdi-plus-box-outline blue--text" id="add-row-btn"
       class="mr-2" tooltip="Add Row" />
 
     <GenericButton color="success" background @click="downloadExcel" icon="mdi-download" id="excel-btn"
@@ -35,25 +35,25 @@ export default {
     return { getColumnsForStep };
   },
   computed: {
-    ...mapGetters(["getSelectedRows", "getCustomData", "getSteps", "getExcelSubTab", "getCurrentStepData"]),
+    ...mapGetters("excel", ["getSelectedRows", "getCustomData", "getSteps", "getExcelSubTab", "getCurrentStepData"]),
     selectedRows() {
-      return this.getSelectedRows;
+      return this.getSelectedRows || [];
     },
     customData() {
-      return this.getCustomData;
+      return this.getCustomData || [];
     },
     steps() {
-      return this.getSteps;
+      return this.getSteps || [];
     },
     excelSubTab() {
-      return this.getExcelSubTab;
+      return this.getExcelSubTab || 0;
     },
     currentStepData() {
-      return this.getCurrentStepData;
+      return this.getCurrentStepData || {};
     },
   },
   methods: {
-    ...mapActions(["setCustomData", "setSelectedRows"]),
+    ...mapActions("excel", ["setCustomData", "setSelectedRows"]),
     downloadExcel() {
       try {
         const workbook = XLSX.utils.book_new();

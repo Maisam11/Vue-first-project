@@ -16,23 +16,16 @@
                 <v-text-field v-model="startDate" placeholder="Start Date" readonly v-bind="attrs" v-on="on" dense outlined
                   style="max-width: 110px; height: 35px; margin-right: 0.3rem;" ></v-text-field>
               </template>
-              <v-date-picker
-                v-model="startDate"
-                @input="startDateMenu = false"
-              ></v-date-picker>
+              <v-date-picker v-model="startDate" @input="startDateMenu = false" ></v-date-picker>
             </v-menu>
             <v-menu v-model="endDateMenu" offset-y >
               <template v-slot:activator="{ on, attrs }">
                 <v-text-field v-model="endDate" placeholder="End Date" readonly v-bind="attrs" v-on="on" dense outlined
                    style="max-width: 110px; height: 35px; margin-right: 0.3rem;" ></v-text-field>
               </template>
-              <v-date-picker
-                v-model="endDate"
-                @input="endDateMenu = false"
-              ></v-date-picker>
+              <v-date-picker v-model="endDate" @input="endDateMenu = false" ></v-date-picker>
             </v-menu>
-            <GenericButton color="primary" @click="applyDateFilter" style="margin-right: 0.3rem;">
-              Filter </GenericButton>
+            <GenericButton color="primary" @click="applyDateFilter" style="margin-right: 0.3rem;"> Filter </GenericButton>
             <GenericButton color="secondary" @click="clearDateFilter" v-if="startDate || endDate" style="margin-right: 0.3rem;">
               Reset </GenericButton>
           </div>
@@ -123,13 +116,9 @@ export default {
       startDate: null,
       endDate: null,
       pagination: {
-        currentPage: 1,
-        itemsPerPage: 10,
-        totalPages: 1,
-        startIndex: 0,
-        endIndex: 0
+        currentPage: 1, itemsPerPage: 10, totalPages: 1, startIndex: 0, endIndex: 0
       },
-      itemsPerPageOptions: [5, 10, 15, 20, 25],
+      itemsPerPageOptions: [5, 10,],
       headers: [
         { text: "", value: "data-table-expand", width: "50px" },
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
@@ -195,6 +184,7 @@ export default {
       this.endDate = null;
       this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
       this.resetPagination();
+      console.log('clear filtered files response');
     },
     resetPagination() {
       this.pagination.currentPage = 1;
@@ -281,7 +271,7 @@ export default {
         alert("No data available to download.");
         return;
       }
-      XLSX.writeFile(wb, "FilteredFiles.xlsx");
+      XLSX.writeFile(wb, "AllFiles.xlsx");
     },
   },
   async mounted() {

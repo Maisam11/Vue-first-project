@@ -33,7 +33,6 @@ export default {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             addedBy: "Current User",
-            sheets: []
           },
     };
   },
@@ -52,7 +51,6 @@ export default {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             addedBy: "Current User",
-            sheets: []
           };
     },
   },

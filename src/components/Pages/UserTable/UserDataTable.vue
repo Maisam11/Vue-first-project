@@ -82,13 +82,13 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(["getCombinedUserData"]),
+    ...mapGetters("users", ["getCombinedUserData"]),
     combinedUsers() {
-      return this.getCombinedUserData;
+      return this.getCombinedUserData || [];
     },
   },
   methods: {
-    ...mapActions(["addUser", "updateUser", "updateFormSubmission", "deleteUser", "deleteFormSubmission"]),
+    ...mapActions("users", ["addUser", "updateUser", "updateFormSubmission", "deleteUser", "deleteFormSubmission"]),
     openDialog(item) {
       this.dialogDelete = false;
       this.editedItem = item

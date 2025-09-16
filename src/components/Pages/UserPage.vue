@@ -19,8 +19,8 @@
 
 <script>
 import { mapActions } from "vuex";
-import ExcelView from "@/components/Pages/ExcelView.vue";
-import UserDataTable from "@/components/Pages/UserTable/UserDataTable.vue";
+import ExcelView from "../Pages/ExcelView.vue";
+import UserDataTable from "../Pages/UserTable/UserDataTable.vue";
 
 export default {
   name: "UserPage",
@@ -34,7 +34,7 @@ export default {
     this.fetchUsers();
   },
   methods: {
-    ...mapActions(["fetchUsers"]),
+    ...mapActions("users", ["fetchUsers"]),
   },
 };
 </script>
