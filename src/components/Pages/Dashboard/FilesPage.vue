@@ -118,7 +118,7 @@ export default {
       pagination: {
         currentPage: 1, itemsPerPage: 10, totalPages: 1, startIndex: 0, endIndex: 0
       },
-      itemsPerPageOptions: [5, 10,],
+      itemsPerPageOptions: [5, 10],
       headers: [
         { text: "", value: "data-table-expand", width: "50px" },
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
@@ -175,6 +175,7 @@ export default {
           }
           return isInRange;
         });
+        console.log('applyDateFilter: Filtered files', filteredFiles);
       }
       this.$store.commit('files/SET_FILTERED_FILES', filteredFiles);
       this.resetPagination();
@@ -184,7 +185,7 @@ export default {
       this.endDate = null;
       this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
       this.resetPagination();
-      console.log('clear filtered files response');
+      console.log('clearDateFilter: Reset to all files', this.getFiles);
     },
     resetPagination() {
       this.pagination.currentPage = 1;
@@ -220,16 +221,20 @@ export default {
       this.editedItem = { ...item };
       this.dialogDelete = true;
     },
-    saveFile(file) {
+    async saveFile(file) {
+      let response;
       if (this.getFiles.find((f) => f.id === file.id)) {
-        this.updateFile({ ...file, updatedAt: new Date().toISOString() });
+        response = await this.updateFile({ ...file, updatedAt: new Date().toISOString() });
+        console.log('saveFile: Updated file', response);
       } else {
-        this.addFile(file);
+        response = await this.addFile(file);
+        console.log('saveFile: Added file', response);
       }
       this.dialog = false;
     },
-    deleteFileConfirm() {
-      this.deleteFile(this.editedItem.id);
+    async deleteFileConfirm() {
+      const response = await this.deleteFile(this.editedItem.id);
+      console.log('deleteFileConfirm: Deleted file ID', response);
       this.dialogDelete = false;
     },
     closeDialog() {
@@ -243,9 +248,9 @@ export default {
     viewSheet(fileId, sheetName) {
       this.$router.push(`/UserDashboard/Files/${fileId}/${sheetName}`);
     },
-    async downloadAllFiles() {
+    downloadAllFiles() {
       if (!this.getFilteredFiles.length) {
-        alert("No files available to download.");
+        console.log('downloadAllFiles: No files available to download');
         return;
       }
       const wb = XLSX.utils.book_new();
@@ -258,7 +263,7 @@ export default {
             const wsData = [
               this.alphabeticalColumns.map(col => col.title),
               ...sheet.data.map(row =>
-                this.alphabeticalColumns.map(col => row[col.field] || "")
+                this.alphabeticalColumns.map(col => row[col.field] || '')
               ),
             ];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -268,22 +273,19 @@ export default {
         }
       }
       if (!hasData) {
-        alert("No data available to download.");
+        console.log('downloadAllFiles: No data available to download');
         return;
       }
-      XLSX.writeFile(wb, "AllFiles.xlsx");
+      XLSX.writeFile(wb, 'AllFiles.xlsx');
+      console.log('downloadAllFiles: Files downloaded successfully');
     },
   },
   async mounted() {
     this.loading = true;
-    try {
-      await this.fetchFiles();
-      this.applyDateFilter();
-    } catch (error) {
-      console.error('Error fetching files:', error);
-    } finally {
-      this.loading = false;
-    }
+    await this.fetchFiles();
+    this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
+    this.resetPagination();
+    this.loading = false;
   },
 };
 </script>

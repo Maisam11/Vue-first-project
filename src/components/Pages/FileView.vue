@@ -262,7 +262,8 @@ export default {
       this.newSheetName = '';
     },
     async saveChanges() {
-      await this.updateFile({ ...this.localFile });
+      const updatedFile = await this.updateFile({ ...this.localFile });
+      console.log('saveFile: Updated file', updatedFile);
     },
     generateRandomId() {
       return Math.random().toString(36).substring(2, 10);

@@ -16,19 +16,17 @@ export default {
     commit('SET_FILTERED_FILES', filesWithSheets);
     return filesWithSheets;
   },
-  async addFile({ commit, dispatch }, file) {
-    if (!file.id) {
-      throw new Error("File ID must be provided");
-    }
+  async addFile({ commit, dispatch, state }, file) {
+    if (!file.id) throw new Error('File ID must be provided');
+    if (state.files.some(f => f.id === file.id)) throw new Error('File with this ID already exists');
     const fileData = {
       name: file.name,
-      createdAt: file.createdAt,
-      updatedAt: file.updatedAt,
-      addedBy: file.addedBy,
+      createdAt: file.createdAt || new Date().toISOString(),
+      updatedAt: file.updatedAt || new Date().toISOString(),
+      addedBy: file.addedBy || 'Maisam Ali',
       sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
     };
-    const createFileResponse = await dispatch('firebase/create', { collectionPath, id: file.id, data: fileData }, { root: true });
-    console.log('addFile create response:', createFileResponse);
+    await dispatch('firebase/create', { collectionPath, id: file.id, data: fileData }, { root: true });
     if (file.sheets && file.sheets.length > 0) {
       for (const sheet of file.sheets) {
         const sheetData = {
@@ -40,20 +38,20 @@ export default {
       }
     }
     commit('ADD_FILE', file);
+    return file;
   },
   async updateFile({ commit, dispatch }, file) {
     const fileData = {
       name: file.name,
       createdAt: file.createdAt,
-      updatedAt: file.updatedAt,
+      updatedAt: file.updatedAt || new Date().toISOString(),
       addedBy: file.addedBy,
       sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
     };
-    const updateFileResponse = await dispatch('firebase/update', { collectionPath, id: file.id, data: fileData }, { root: true });
-    console.log('updateFile update response:', updateFileResponse);
-    const existingSheets = await dispatch('getSheets', { fileId: file.id });
-    for (const es of existingSheets) {
-      await dispatch('deleteSheet', { fileId: file.id, sheetName: es.id });
+   await dispatch('firebase/update', { collectionPath, id: file.id, data: fileData }, { root: true });
+    const existingSheetNames = fileData.sheetNames || [];
+    for (const sheetName of existingSheetNames) {
+      await dispatch('deleteSheet', { fileId: file.id, sheetName });
     }
     if (file.sheets && file.sheets.length > 0) {
       for (const sheet of file.sheets) {
@@ -66,37 +64,39 @@ export default {
       }
     }
     commit('UPDATE_FILE', file);
+    return file;
   },
-  async deleteFile({ commit, dispatch }, fileId) {
-    const existingSheets = await dispatch('getSheets', { fileId });
-    for (const es of existingSheets) {
-      await dispatch('deleteSheet', { fileId, sheetName: es.id });
+  async deleteFile({ commit, dispatch, state }, fileId) {
+    const file = state.files.find(f => f.id === fileId);
+    const existingSheetNames = file && file.sheetNames ? file.sheetNames : [];
+    for (const sheetName of existingSheetNames) {
+      await dispatch('deleteSheet', { fileId, sheetName });
     }
-    const deleteFileResponse = await dispatch('firebase/delete', { collectionPath, id: fileId }, { root: true });
-    console.log('deleteFile response:', deleteFileResponse);
+    await dispatch('firebase/delete', { collectionPath, id: fileId }, { root: true });
     commit('DELETE_FILE', fileId);
+    return fileId;
   },
   async getFileById({ dispatch }, id) {
     const fileDataResponse = await dispatch('firebase/getById', { collectionPath, id }, { root: true });
     console.log('getFileById response:', fileDataResponse);
     if (!fileDataResponse) return null;
     const sheets = await dispatch('getSheets', { fileId: id });
-    return { ...fileDataResponse, sheets: sheets.map(s => ({ name: s.id, ...s })) };
+    const fileWithSheets = { ...fileDataResponse, sheets: sheets.map(s => ({ name: s.id, ...s })) };
+    return fileWithSheets;
   },
-    async getSheets({ dispatch }, { fileId }) {
+  async getSheets({ dispatch }, { fileId }) {
     const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
     const sheetsResponse = await dispatch('firebase/getAll', { collectionPath: sheetsPath }, { root: true });
-    // console.log('getSheets response:', sheetsResponse);
     return sheetsResponse;
   },
   async setSheet({ dispatch }, { fileId, sheetName, data }) {
     const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
     await dispatch('firebase/create', { collectionPath: sheetsPath, id: sheetName, data }, { root: true });
-    // console.log('setSheet response:', setSheetResponse);
+    return { name: sheetName, ...data };
   },
   async deleteSheet({ dispatch }, { fileId, sheetName }) {
     const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
     await dispatch('firebase/delete', { collectionPath: sheetsPath, id: sheetName }, { root: true });
-    // console.log('deleteSheet response:', deleteSheetResponse);
+    return sheetName;
   },
 };
