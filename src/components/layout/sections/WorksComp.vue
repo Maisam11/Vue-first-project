@@ -55,7 +55,7 @@
     name: "WorksComp",
     data() {
     return {
-      worksbanner: "https://phofix.juragancode.id/assets/img/how-it-work-banner.png"
+      worksbanner: "https://www.shutterstock.com/image-vector/mobile-phone-repair-service-perhaps-600w-2545313707.jpg"
     }
   }
   };

@@ -20,7 +20,10 @@
           </v-list-item-content>
         </v-list-item>
       </v-list>
-      <v-spacer />
+      <div>
+       <v-btn @click="logout">Logout</v-btn>
+      </div>
+      
     </v-app-bar>
     <!-- Sidebar -->
     <v-navigation-drawer
@@ -265,6 +268,12 @@ export default {
         ],
       },
     };
+  },
+methods: {
+    async logout() {
+      await this.$store.dispatch('auth/signOut');
+      this.$router.push('/login');
+    },
   },
   computed: {
     contentClass() {

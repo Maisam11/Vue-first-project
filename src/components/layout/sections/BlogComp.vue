@@ -64,14 +64,14 @@ export default {
       blogsub: require("@/assets/blog-subscribe.png"),
       blogs: [
         {
-          image: "https://phofix.juragancode.id/assets/img/blog/blog1.jpg",
+          image: "https://t3.ftcdn.net/jpg/05/19/73/36/360_F_519733648_tSMSHwqxw3TrbgFSXNKJVKncdkC0siTq.jpg",
           date: "03 January 2024",
           title: "Unlocking the Secrets of Effective Cell Phone Repairs",
           description:
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore veniam dolore...",
         },
         {
-          image: "https://phofix.juragancode.id/assets/img/blog/blog2.jpg",
+          image: "https://www.diyfixtool.com/cdn/shop/articles/05qOG26wzVLHG2nlWpelvCF-1..v1683302270_jpg_JPEG_1600x900_71.png?v=1701080915",
           date: "23 January 2024",
           title:
             "Essential Tips for Mobile Phone Repairs: A Comprehensive Guide",
@@ -79,7 +79,7 @@ export default {
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore veniam dolore...",
         },
         {
-          image: "https://phofix.juragancode.id/assets/img/blog/blog3.jpg",
+          image: "https://www.shutterstock.com/image-vector/phone-ai-artificial-intelligence-robot-260nw-2486564043.jpg",
           date: "28 January 2024",
           title:
             "Navigating Common Mobile Repair Issues: Solutions and Strategies",

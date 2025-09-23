@@ -48,7 +48,7 @@
     name: "HeroComp",
     data() {
     return {
-      herobanner: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR82AFnfLWS6CwAD7JU95o7349WHxwo4g3gDw&s"
+      herobanner: "https://i.pinimg.com/736x/28/ce/10/28ce108f109299ed27ebac38527ab03b.jpg"
     }
   },
     methods: {

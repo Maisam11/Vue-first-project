@@ -30,7 +30,7 @@
     name: 'AboutComp',
     data(){
       return{
-        aboutbanner:"https://phofix.juragancode.id/assets/img/repair-banner.png"
+        aboutbanner:"https://www.shutterstock.com/image-vector/mobile-phone-repair-service-perhaps-600w-2545313707.jpg"
       }
     },
   };

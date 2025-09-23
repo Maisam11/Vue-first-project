@@ -56,7 +56,7 @@ export default {
             "The choice depends on your business’s needs and resources. If you can’t afford to add an accountant to your payroll but need insight during tax season, you have the option to hire a short-term contractor.",
         },
       ],
-      faqbanner: "https://phofix.juragancode.id/assets/img/faq-banner.png",
+      faqbanner: "https://www.shutterstock.com/image-vector/mobile-phone-repair-service-perhaps-600w-2545313707.jpg",
     };
   },
 };

@@ -43,11 +43,6 @@ export default {
           icon: "mdi-dots-horizontal",
           to: "/UserDashboard/More",
         },
-        {
-          title: "Logout",
-          icon: "mdi-logout",
-          to: "/",
-        },
       ],
 
       // Toolbar top header menu items
@@ -63,10 +58,6 @@ export default {
         {
           title: "Files",
           to: "/UserDashboard/Files",
-        },
-        {
-          title: "Logout",
-          to: "/",
         },
       ],
     };

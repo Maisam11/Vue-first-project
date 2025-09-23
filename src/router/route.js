@@ -14,7 +14,6 @@ import FAQComp from "../components/layout/sections/FAQComp.vue";
 import BlogComp from "../components/layout/sections/BlogComp.vue";
 import UserPage from "../components/Pages/UserPage.vue";
 import VueStepper from "../components/Pages/VueStepper.vue";
-
 import UserDashboard from "../components/Pages/UserDashboard.vue";
 import SettingsFile from "../components/Pages/Settings.vue";
 import Setting1File from "../components/Pages/Setting1.vue";
@@ -22,10 +21,13 @@ import Setting2File from "../components/Pages/Setting2.vue";
 import MorePage from "../components/Pages/More.vue";
 import FilesPage from "../components/Pages/Dashboard/FilesPage.vue";
 import FileView from '@/components/Pages/FileView.vue';
+import LoginComp from '../components/Pages/LoginComp.vue';
+import RegisterComp from '../components/Pages/RegisterComp.vue';
+import store from '../store';
 
 Vue.use(Router);
 
-export default new Router({
+const router = new Router({
   mode: "history",
   routes: [
     {
@@ -44,10 +46,10 @@ export default new Router({
         { path: "FAQComp", component: FAQComp },
         { path: "BlogComp", component: BlogComp },
         { path: "VueStepper", component: VueStepper },
+        { path: "login", component: LoginComp, name: 'login' },
+        { path: "register", component: RegisterComp, name: 'register' },
       ],
     },
-
-    // UserDashboard route
     {
       path: "/UserDashboard",
       component: UserDashboard,
@@ -63,10 +65,12 @@ export default new Router({
         {
           path: "Files",
           component: FilesPage,
+          meta: { requiresAuth: true },
         },
         {
-        path: 'Files/:id',
-        component: FileView,
+          path: "Files/:id",
+          component: FileView,
+          meta: { requiresAuth: true },
         },
         {
           path: "Settings",
@@ -81,8 +85,34 @@ export default new Router({
               component: Setting2File,
             },
           ],
-        },       
+        },
       ],
     },
   ],
 });
+
+// Route guard for protected routes
+router.beforeEach(async (to, from, next) => {
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+  const isAuthenticated = store.getters['auth/isAuthenticated'];
+  
+  if (requiresAuth) {
+    console.log('Router: Checking authentication for protected route, isAuthenticated:', isAuthenticated);
+    if (!isAuthenticated) {
+      console.log('Router: Redirecting to login, user not authenticated');
+      next({ name: 'login', query: { redirect: to.fullPath } });
+    } else {
+      next();
+    }
+  } else if (to.name === 'login' && isAuthenticated) {
+    console.log('Router: Already authenticated, redirecting to Files');
+    next(to.query.redirect || '/FilesPage');
+  } else if (to.name === 'register' && isAuthenticated) {
+    console.log('Router: Already authenticated, redirecting to Files');
+    next(to.query.redirect || '/FilesPage');
+  } else {
+    next();
+  }
+});
+
+export default router;
