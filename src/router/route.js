@@ -106,10 +106,10 @@ router.beforeEach(async (to, from, next) => {
     }
   } else if (to.name === 'login' && isAuthenticated) {
     console.log('Router: Already authenticated, redirecting to Files');
-    next(to.query.redirect || '/FilesPage');
+    next(to.query.redirect || '/UserDashboard/Files');
   } else if (to.name === 'register' && isAuthenticated) {
     console.log('Router: Already authenticated, redirecting to Files');
-    next(to.query.redirect || '/FilesPage');
+    next(to.query.redirect || '/UserDashboard/Files');
   } else {
     next();
   }

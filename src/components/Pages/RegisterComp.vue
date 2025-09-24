@@ -51,7 +51,7 @@ export default {
         });
         await this.$nextTick();
         if (this.$store.getters['auth/isAuthenticated']) {
-          const redirect = this.$route.query.redirect || '/FilesPage';
+          const redirect = this.$route.query.redirect || '/UserDashboard/Files';
           console.log('RegisterComp: Redirecting to', redirect);
           this.$router.push(redirect);
         } else {
