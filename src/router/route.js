@@ -91,7 +91,6 @@ const router = new Router({
   ],
 });
 
-// Route guard for protected routes
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const isAuthenticated = store.getters['auth/isAuthenticated'];

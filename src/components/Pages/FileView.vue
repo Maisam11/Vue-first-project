@@ -270,6 +270,11 @@ export default {
     },
   },
   async mounted() {
+    if (!this.$store.getters['auth/isAuthenticated']) {
+      console.log('mounted: User not authenticated, redirecting to login');
+      this.$router.push({ name: 'login', query: { redirect: this.$route.fullPath } });
+      return;
+    }
     this.loading = true;
     try {
       this.localFile = await this.getFileById(this.$route.params.id);
@@ -277,7 +282,7 @@ export default {
         this.localFile = null;
       }
     } catch (error) {
-      console.error('Error fetching file:', error);
+      console.log('mounted: Error fetching file:', error.message);
       this.localFile = null;
     } finally {
       this.loading = false;

@@ -208,7 +208,7 @@ export default {
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            addedBy: "Maisam Ali",
+            addedBy: this.$store.getters['auth/currentUser']?.username || 'Unknown',
             sheets: []
           };
       this.dialog = true;
@@ -281,11 +281,21 @@ export default {
     },
   },
   async mounted() {
+    if (!this.$store.getters['auth/isAuthenticated']) {
+      console.log('mounted: User not authenticated, redirecting to login');
+      this.$router.push({ name: 'login', query: { redirect: this.$route.fullPath } });
+      return;
+    }
     this.loading = true;
-    await this.fetchFiles();
-    this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
-    this.resetPagination();
-    this.loading = false;
+    try {
+      await this.fetchFiles();
+      this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
+      this.resetPagination();
+    } catch (error) {
+      console.log('mounted: Error fetching files:', error.message);
+    } finally {
+      this.loading = false;
+    }
   },
 };
 </script>

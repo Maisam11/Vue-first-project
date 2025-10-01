@@ -53,7 +53,6 @@ export default {
       return Math.random().toString(36).substring(2, 10);
     },
     focusInput() {
-      // Delay focus to avoid autofocus conflict
       this.$nextTick(() => {
         if (this.$refs.fileNameInput) {
           this.$refs.fileNameInput.focus();
