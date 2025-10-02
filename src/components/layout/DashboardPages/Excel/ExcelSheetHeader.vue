@@ -25,7 +25,7 @@
 import { mapGetters, mapActions } from "vuex";
 import GenericButton from "@/components/common/GenericButton.vue";
 import * as XLSX from "xlsx";
-import { useExcelColumns } from "@/components/Pages/Excel/excelColumn/useExcelColumns";
+import { useExcelColumns } from "../Excel/excelColumn/useExcelColumns"
 
 export default {
   name: "ExcelSheetHeader",

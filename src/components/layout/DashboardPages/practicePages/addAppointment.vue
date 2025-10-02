@@ -34,7 +34,6 @@
       <v-card>
         <v-card-title> Add Appointment </v-card-title>
         <v-card-text>
-          <!-- <v-text-field v-model="appointment.date" label="Date" type="date"></v-text-field> -->
           <GenericTextField
             v-model="appointment.date"
             label="Date"
@@ -48,8 +47,6 @@
           ></v-textarea>
         </v-card-text>
         <v-card-actions>
-          <!-- <v-btn color="red" text @click="dialog = false">Cancel</v-btn>
-            <v-btn color="green" text @click="saveAppointment">Save</v-btn> -->
           <v-spacer></v-spacer>
           <GenericButton color="primary" background @click="dialog = false"
             >Cancel</GenericButton

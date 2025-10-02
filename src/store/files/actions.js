@@ -1,16 +1,9 @@
-import { auth } from '../../firebase';
 const collectionPath = '78910-files';
 const subCollectionPath = 'sheets';
 
 export default {
-  async fetchFiles({ commit, dispatch, rootGetters }) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('fetchFiles: User not authenticated, skipping data retrieval');
-      return [];
-    }
+  async fetchFiles({ commit, dispatch }) {
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('fetchFiles: Token validated', token.slice(0, 10) + '...');
       const filesResponse = await dispatch('firebase/getAll', { collectionPath }, { root: true });
       console.log('fetchFiles response:', filesResponse);
       const filesWithSheets = await Promise.all(filesResponse.map(async (file) => {
@@ -28,21 +21,15 @@ export default {
       throw error;
     }
   },
-  async addFile({ commit, dispatch, state, rootGetters }, file) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('addFile: User not authenticated, cannot add file');
-      throw new Error('User not authenticated');
-    }
+  async addFile({ commit, dispatch, state }, file) {
     if (!file.id) throw new Error('File ID must be provided');
     if (state.files.some(f => f.id === file.id)) throw new Error('File with this ID already exists');
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('addFile: Token validated', token.slice(0, 10) + '...');
       const fileData = {
         name: file.name,
         createdAt: file.createdAt || new Date().toISOString(),
         updatedAt: file.updatedAt || new Date().toISOString(),
-        addedBy: rootGetters['auth/currentUser']?.username || 'Unknown',
+        addedBy: file.addedBy || 'Unknown',
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
       };
       await dispatch('firebase/create', { collectionPath, id: file.id, data: fileData }, { root: true });
@@ -63,14 +50,8 @@ export default {
       throw error;
     }
   },
-  async updateFile({ commit, dispatch, rootGetters }, file) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('updateFile: User not authenticated, cannot update file');
-      throw new Error('User not authenticated');
-    }
+  async updateFile({ commit, dispatch }, file) {
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('updateFile: Token validated', token.slice(0, 10) + '...');
       const fileData = {
         name: file.name,
         createdAt: file.createdAt,
@@ -100,14 +81,8 @@ export default {
       throw error;
     }
   },
-  async deleteFile({ commit, dispatch, state, rootGetters }, fileId) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('deleteFile: User not authenticated, cannot delete file');
-      throw new Error('User not authenticated');
-    }
+  async deleteFile({ commit, dispatch, state }, fileId) {
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('deleteFile: Token validated', token.slice(0, 10) + '...');
       const file = state.files.find(f => f.id === fileId);
       const existingSheetNames = file && file.sheetNames ? file.sheetNames : [];
       for (const sheetName of existingSheetNames) {
@@ -121,14 +96,8 @@ export default {
       throw error;
     }
   },
-  async getFileById({ dispatch, rootGetters }, id) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('getFileById: User not authenticated, skipping data retrieval');
-      return null;
-    }
+  async getFileById({ dispatch }, id) {
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('getFileById: Token validated', token.slice(0, 10) + '...');
       const fileDataResponse = await dispatch('firebase/getById', { collectionPath, id }, { root: true });
       console.log('getFileById response:', fileDataResponse);
       if (!fileDataResponse) return null;
@@ -140,7 +109,7 @@ export default {
       throw error;
     }
   },
-  async getSheets({ dispatch}, { fileId }) {
+  async getSheets({ dispatch }, { fileId }) {
     try {
       const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
       const sheetsResponse = await dispatch('firebase/getAll', { collectionPath: sheetsPath }, { root: true });
@@ -150,14 +119,8 @@ export default {
       throw error;
     }
   },
-  async setSheet({ dispatch, rootGetters }, { fileId, sheetName, data }) {
-    if (!rootGetters['auth/isAuthenticated']) {
-      console.log('setSheet: User not authenticated, cannot set sheet');
-      throw new Error('User not authenticated');
-    }
+  async setSheet({ dispatch }, { fileId, sheetName, data }) {
     try {
-      const token = await auth.currentUser.getIdToken();
-      console.log('setSheet: Token validated', token.slice(0, 10) + '...');
       const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
       await dispatch('firebase/create', { collectionPath: sheetsPath, id: sheetName, data }, { root: true });
       return { name: sheetName, ...data };
@@ -166,7 +129,7 @@ export default {
       throw error;
     }
   },
-  async deleteSheet({ dispatch}, { fileId, sheetName }) {
+  async deleteSheet({ dispatch }, { fileId, sheetName }) {
     try {
       const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
       await dispatch('firebase/delete', { collectionPath: sheetsPath, id: sheetName }, { root: true });

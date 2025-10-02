@@ -44,11 +44,11 @@
 
 <script>
 import { mapGetters, mapActions } from "vuex";
-import GenericButton from "@/components/common/GenericButton.vue";
-import GenericDataTable from "@/components/common/GenericDataTable.vue";
-import TableActions from "@/components/custom-columns/TableActions.vue";
-import UserDialog from "@/components/Pages/modals/UserDialog.vue";
-import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
+import GenericButton from "../../../../common/GenericButton.vue";
+import GenericDataTable from "../../../../common/GenericDataTable.vue"
+import TableActions from "../../../../custom-columns/TableActions.vue"
+import UserDialog from "../../modals/UserDialog.vue";
+import DeleteDialog from "../../modals/DeleteDialog.vue";
 
 export default {
   name: "UserDataTable",

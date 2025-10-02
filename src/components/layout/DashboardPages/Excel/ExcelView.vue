@@ -33,9 +33,9 @@
 <script>
 import { mapGetters, mapActions } from "vuex";
 import GenericExcelSheet from "@/components/common/GenericExcelSheet.vue";
-import ExcelSheetHeader from "@/components/Pages/Excel/ExcelSheetHeader.vue";
-import StepperComp from "@/components/Pages/Excel/StepperComp.vue";
-import { useExcelColumns } from "@/components/Pages/Excel/excelColumn/useExcelColumns";
+import ExcelSheetHeader from "./ExcelSheetHeader.vue";
+import StepperComp from "./StepperComp.vue";
+import { useExcelColumns } from "../Excel/excelColumn/useExcelColumns"
 
 export default {
   name: "ExcelView",

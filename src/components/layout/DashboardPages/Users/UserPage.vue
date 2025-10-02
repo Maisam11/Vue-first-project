@@ -19,8 +19,8 @@
 
 <script>
 import { mapActions } from "vuex";
-import ExcelView from "../Pages/ExcelView.vue";
-import UserDataTable from "../Pages/UserTable/UserDataTable.vue";
+import ExcelView from "../Excel/ExcelView.vue";
+import UserDataTable from "../Users/UserTable/UserDataTable.vue";
 
 export default {
   name: "UserPage",

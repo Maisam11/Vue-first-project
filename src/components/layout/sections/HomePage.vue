@@ -4,7 +4,7 @@
   </div>
 </template>
 <script>
-import HeroComp from "../layout/sections/HeroComp.vue";
+import HeroComp from "./HeroComp.vue";
 export default {
   name: 'HomePage',
     components: { 

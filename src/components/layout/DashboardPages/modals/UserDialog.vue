@@ -35,9 +35,8 @@
 </template>
 
 <script>
-import GenericButton from "@/components/common/GenericButton.vue";
-import GenericTextField from "@/components/common/GenericTextField.vue";
-
+import GenericButton from "../../../common/GenericButton.vue"
+import GenericTextField from "../../../common/GenericTextField.vue"
 export default {
   components: { GenericButton, GenericTextField },
   props: {
@@ -78,7 +77,6 @@ export default {
   methods: {
     save() {
       this.isLoading = true;
-      // Ensure localEditedItem has all required fields
       const userData = {
         id: this.localEditedItem.id || String(Date.now()),
         name: this.localEditedItem.name || "",

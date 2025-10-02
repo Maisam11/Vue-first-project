@@ -84,9 +84,9 @@
 </template>
 
 <script>
-import GenericButton from "@/components/common/GenericButton.vue";
-import GenericExcelSheet from "@/components/common/GenericExcelSheet.vue";
-import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
+import GenericButton from "../../../common/GenericButton.vue"
+import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
+import DeleteDialog from "../modals/DeleteDialog.vue";
 import { mapActions } from "vuex";
 
 export default {

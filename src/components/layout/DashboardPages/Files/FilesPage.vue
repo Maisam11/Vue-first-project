@@ -49,9 +49,9 @@
                 </v-list-item-subtitle>
               </v-list-item-content>
             </v-list-item>
-          </v-list>
-        </td>
-      </template>
+            </v-list>
+          </td>
+        </template>
       <template v-slot:column-createdAt="{ item }">
         {{ formatDate(item.createdAt) }}
       </template>
@@ -95,11 +95,11 @@
 
 <script>
 import { mapGetters, mapActions } from "vuex";
-import GenericButton from "@/components/common/GenericButton.vue";
-import GenericDataTable from "@/components/common/GenericDataTable.vue";
-import TableActions from "@/components/custom-columns/TableActions.vue";
-import FileDialog from "@/components/Pages/modals/FileDialog.vue";
-import DeleteDialog from "@/components/Pages/modals/DeleteDialog.vue";
+import GenericButton from "../../../common/GenericButton.vue";
+import GenericDataTable from "../../../common/GenericDataTable.vue";
+import TableActions from "../../../custom-columns/TableActions.vue";
+import FileDialog from "../modals/FileDialog.vue";
+import DeleteDialog from "../modals/DeleteDialog.vue"
 import * as XLSX from "xlsx";
 
 export default {
