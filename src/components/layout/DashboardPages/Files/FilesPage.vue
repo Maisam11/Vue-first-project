@@ -99,7 +99,7 @@ import GenericButton from "../../../common/GenericButton.vue";
 import GenericDataTable from "../../../common/GenericDataTable.vue";
 import TableActions from "../../../custom-columns/TableActions.vue";
 import FileDialog from "../modals/FileDialog.vue";
-import DeleteDialog from "../modals/DeleteDialog.vue"
+import DeleteDialog from "../modals/DeleteDialog.vue";
 import * as XLSX from "xlsx";
 
 export default {

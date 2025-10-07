@@ -57,6 +57,8 @@ export default {
         } else {
           console.log('RegisterComp: Authentication state not updated');
         }
+        // For testing: Always redirect to dashboard after register
+        this.$router.push('/UserDashboard/Files');
       } catch (error) {
         console.log('RegisterComp: Registration failed:', error.code, error.message);
       }
@@ -64,6 +66,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-</style>

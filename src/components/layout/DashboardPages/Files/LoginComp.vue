@@ -57,6 +57,8 @@ export default {
         } else {
           console.log('LoginComp: Authentication state not updated');
         }
+        // For testing: Always redirect to dashboard after login
+        this.$router.push('/UserDashboard/Files');
       } catch (error) {
         console.log('LoginComp: Login failed:', error.code, error.message);
       }
@@ -64,6 +66,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-</style>
