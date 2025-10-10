@@ -1,4 +1,4 @@
-import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from '../../firebase';
+import { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from '../../firebase';
 
 export default {
   namespaced: true,
@@ -13,7 +13,7 @@ export default {
   actions: {
     async signUp({ commit }, { username, password }) {
       try {
-        const email = `${username}@example.com`;
+        const email = `${username}@gmail.com`;
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = { uid: userCredential.user.uid, username };
         commit('SET_USER', user);
@@ -26,7 +26,7 @@ export default {
     },
     async signIn({ commit }, { username, password }) {
       try {
-        const email = `${username}@example.com`;
+        const email = `${username}@gmail.com`;
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = { uid: userCredential.user.uid, username };
         commit('SET_USER', user);
@@ -45,6 +45,17 @@ export default {
       } catch (error) {
         console.log('signOut: Error:', error.code, error.message);
         throw error;
+      }
+    },
+    async resetPassword(_, { username }) {
+      try {
+        const email = `${username}@gmail.com`;
+        await sendPasswordResetEmail(auth, email);
+        console.log('resetPassword: Password reset email sent to', email);
+        return { success: true, message: `Password reset email sent to ${email}. Please check your inbox.` };
+      } catch (error) {
+        console.log('resetPassword: Error:', error.code, error.message);
+        throw new Error(error.message);
       }
     },
   },
