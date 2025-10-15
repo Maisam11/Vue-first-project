@@ -65,6 +65,7 @@
 </template>
 
 <script>
+import { mapActions } from "vuex";
 export default {
   name: "LoginComp",
   data() {
@@ -78,12 +79,17 @@ export default {
     };
   },
   methods: {
+    ...mapActions("auth", ["signIn", "resetPassword"]),
+    ...mapActions("roles", ["fetchUserRole"]),
     async handleLogin() {
       try {
-        await this.$store.dispatch('auth/signIn', {
+        const user = await this.signIn({
           username: this.username,
           password: this.password,
         });
+        if (user && user.uid) {
+          await this.fetchUserRole(user.uid);
+        }
         await this.$nextTick();
         if (this.$store.getters['auth/isAuthenticated']) {
           const redirect = this.$route.query.redirect || '/UserDashboard/Files';
@@ -98,7 +104,7 @@ export default {
     },
     async handleResetPassword() {
       try {
-        const result = await this.$store.dispatch('auth/resetPassword', {
+        const result = await this.resetPassword({
           username: this.resetUsername,
         });
         this.resetMessage = result.message;

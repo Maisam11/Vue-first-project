@@ -1,5 +1,14 @@
 <template>
   <div style="margin: 1rem 2.1rem 5rem 1rem;">
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
+      {{ snackbar.message }}
+      <template v-slot:action="{ attrs }">
+        <v-btn text v-bind="attrs" @click="snackbar.show = false">
+          Close
+        </v-btn>
+      </template>
+    </v-snackbar>
+
     <GenericDataTable 
       :headers="headers" 
       :items="paginatedFiles" 
@@ -30,7 +39,7 @@
               Reset </GenericButton>
           </div>
           <div class="d-flex">
-            <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn"> 
+            <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn" v-if="canCreateFiles"> 
               File </GenericButton>
             <GenericButton color="success" background icon="mdi-download" @click="downloadAllFiles" :disabled="getFilteredFiles.length === 0"
               id="download-files-btn"> 
@@ -59,7 +68,10 @@
         {{ formatDate(item.updatedAt) }}
       </template>
       <template v-slot:column-actions="{ item }">
-        <TableActions :item="item" :onEdit="openDialog" :onView="viewFile" :onDelete="openDeleteDialog" />
+        <TableActions :item="item" 
+          :onEdit="canEditFiles ? openDialog : null" 
+          :onView="viewFile" 
+          :onDelete="canDeleteFiles ? openDeleteDialog : null" />
       </template>
     </GenericDataTable>
     <v-card>
@@ -88,8 +100,8 @@
       </v-card-text>
     </v-card>
     <FileDialog :dialog="dialog" :editedItem="editedItem" @update:dialog="dialog = $event" @update:editedItem="editedItem = $event"
-      @save="saveFile" @closeDialog="closeDialog" />
-    <DeleteDialog :dialog="dialogDelete" @confirm="deleteFileConfirm" @closeDialog="closeDialog" />
+      @save="saveFile" @closeDialog="closeDialog" v-if="canCreateFiles || canEditFiles" />
+    <DeleteDialog :dialog="dialogDelete" @confirm="deleteFileConfirm" @closeDialog="closeDialog" v-if="canDeleteFiles" />
   </div>
 </template>
 
@@ -115,6 +127,7 @@ export default {
       endDateMenu: false,
       startDate: null,
       endDate: null,
+      snackbar: { show: false, message: '', color: 'success' },
       pagination: {
         currentPage: 1, itemsPerPage: 10, totalPages: 1, startIndex: 0, endIndex: 0
       },
@@ -136,11 +149,21 @@ export default {
   },
   computed: {
     ...mapGetters("files", ["getFiles", "getFilteredFiles"]),
+    ...mapGetters("roles", ["canUserPerformAction", "getCurrentUserRole"]),
     paginatedFiles() {
       const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
       const end = start + this.pagination.itemsPerPage;
       return this.getFilteredFiles.slice(start, end);
     },
+    canCreateFiles() {
+      return this.canUserPerformAction('files', 'create');
+    },
+    canEditFiles() {
+      return this.canUserPerformAction('files', 'update');
+    },
+    canDeleteFiles() {
+      return this.canUserPerformAction('files', 'delete');
+    }
   },
   watch: {
     'pagination.currentPage': function() {
@@ -152,6 +175,11 @@ export default {
   },
   methods: {
     ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFiles"]),
+    showNotification(message, type = 'success') {
+      this.snackbar.message = message;
+      this.snackbar.color = type;
+      this.snackbar.show = true;
+    },
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
@@ -175,7 +203,6 @@ export default {
           }
           return isInRange;
         });
-        console.log('applyDateFilter: Filtered files', filteredFiles);
       }
       this.$store.commit('files/SET_FILTERED_FILES', filteredFiles);
       this.resetPagination();
@@ -185,7 +212,6 @@ export default {
       this.endDate = null;
       this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
       this.resetPagination();
-      console.log('clearDateFilter: Reset to all files', this.getFiles);
     },
     resetPagination() {
       this.pagination.currentPage = 1;
@@ -200,6 +226,14 @@ export default {
       );
     },
     openDialog(item) {
+      if (item && !this.canEditFiles) {
+        this.showNotification('You do not have permission to edit files', 'error');
+        return;
+      }
+      if (!item && !this.canCreateFiles) {
+        this.showNotification('You do not have permission to create files', 'error');
+        return;
+      }
       this.dialogDelete = false;
       this.editedItem = item
         ? { ...item, sheets: item.sheets || [] }
@@ -217,25 +251,38 @@ export default {
       return Math.random().toString(36).substring(2, 10);
     },
     openDeleteDialog(item) {
+      if (!this.canDeleteFiles) {
+        this.showNotification('You do not have permission to delete files', 'error');
+        return;
+      }
       this.dialog = false;
       this.editedItem = { ...item };
       this.dialogDelete = true;
     },
     async saveFile(file) {
-      let response;
-      if (this.getFiles.find((f) => f.id === file.id)) {
-        response = await this.updateFile({ ...file, updatedAt: new Date().toISOString() });
-        console.log('saveFile: Updated file', response);
-      } else {
-        response = await this.addFile(file);
-        console.log('saveFile: Added file', response);
+      try {
+        if (this.getFiles.find((f) => f.id === file.id)) {
+          await this.updateFile({ ...file, updatedAt: new Date().toISOString() });
+          this.showNotification('File updated successfully');
+        } else {
+          await this.addFile(file);
+          this.showNotification('File created successfully');
+        }
+        this.dialog = false;
+      } catch (error) {
+        console.error('Error saving file:', error);
+        this.showNotification('Error saving file: ' + error.message, 'error');
       }
-      this.dialog = false;
     },
     async deleteFileConfirm() {
-      const response = await this.deleteFile(this.editedItem.id);
-      console.log('deleteFileConfirm: Deleted file ID', response);
-      this.dialogDelete = false;
+      try {
+        await this.deleteFile(this.editedItem.id);
+        this.showNotification('File deleted successfully');
+        this.dialogDelete = false;
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        this.showNotification('Error deleting file: ' + error.message, 'error');
+      }
     },
     closeDialog() {
       this.dialog = false;
@@ -250,7 +297,7 @@ export default {
     },
     downloadAllFiles() {
       if (!this.getFilteredFiles.length) {
-        console.log('downloadAllFiles: No files available to download');
+        this.showNotification('No files available to download', 'warning');
         return;
       }
       const wb = XLSX.utils.book_new();
@@ -273,19 +320,23 @@ export default {
         }
       }
       if (!hasData) {
-        console.log('downloadAllFiles: No data available to download');
+        this.showNotification('No data available to download', 'warning');
         return;
       }
       XLSX.writeFile(wb, 'AllFiles.xlsx');
-      console.log('downloadAllFiles: Files downloaded successfully');
+      this.showNotification('Files downloaded successfully');
     },
   },
   async mounted() {
     if (!this.$store.getters['auth/isAuthenticated']) {
-      console.log('mounted: User not authenticated, redirecting to login');
       this.$router.push({ name: 'login', query: { redirect: this.$route.fullPath } });
       return;
     }
+    const currentUser = this.$store.getters['auth/currentUser'];
+    if (currentUser && currentUser.uid) {
+      await this.$store.dispatch('roles/fetchUserRole', currentUser.uid);
+    }
+    
     this.loading = true;
     try {
       await this.fetchFiles();
@@ -293,6 +344,7 @@ export default {
       this.resetPagination();
     } catch (error) {
       console.log('mounted: Error fetching files:', error.message);
+      this.showNotification('Error fetching files: ' + error.message, 'error');
     } finally {
       this.loading = false;
     }

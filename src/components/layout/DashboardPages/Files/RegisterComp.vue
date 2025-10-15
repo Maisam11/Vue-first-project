@@ -23,6 +23,15 @@
                 required
                 class="mb-2"
               ></v-text-field>
+              <v-select
+                v-model="role"
+                :items="userRoles"
+                label="Select Role"
+                outlined
+                dense
+                required
+                class="mb-2"
+              ></v-select>
               <v-btn color="primary" type="submit" block>Register</v-btn>
               <v-btn color="secondary" to="/login" block class="mt-2">Login</v-btn>
             </v-form>
@@ -34,21 +43,40 @@
 </template>
 
 <script>
+import { mapGetters, mapActions } from "vuex";
 export default {
   name: "RegisterComp",
   data() {
     return {
       username: '',
       password: '',
+      role: 'user',
     };
   },
+  computed: {
+    ...mapGetters("roles", ["getUserRoles"]),
+    userRoles() {
+      return this.getUserRoles.map(role => ({
+        text: role.charAt(0).toUpperCase() + role.slice(1),
+        value: role
+      }));
+    }
+  },
   methods: {
+    ...mapActions("auth", ["signUp"]),
+    ...mapActions("roles", ["setUserRole"]),
     async handleRegister() {
       try {
-        await this.$store.dispatch('auth/signUp', {
+        const user = await this.signUp({
           username: this.username,
           password: this.password,
         });
+        if (user && user.uid) {
+          await this.setUserRole({
+            userId: user.uid,
+            role: this.role
+          });
+        }
         await this.$nextTick();
         if (this.$store.getters['auth/isAuthenticated']) {
           const redirect = this.$route.query.redirect || '/UserDashboard/Files';

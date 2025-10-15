@@ -6,6 +6,7 @@ import firebaseModule from './firebase';
 import usersModule from './users';
 import excelModule from './excel';
 import authModule from './auth';
+import rolesModule from './roles';
 
 Vue.use(Vuex);
 
@@ -16,6 +17,7 @@ export default new Vuex.Store({
     users: usersModule,
     excel: excelModule,
     auth: authModule,
+    roles: rolesModule,
   },
   plugins: [
     createPersistedState({
