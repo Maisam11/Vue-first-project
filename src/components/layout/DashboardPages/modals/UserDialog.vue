@@ -2,24 +2,25 @@
   <v-dialog v-model="localDialog" @click:outside="closeDialog" max-width="500px">
     <v-card>
       <v-card-title>
-        <span class="text-h5">{{
-          localEditedItem.id ? "User" : "New User"
-        }}</span>
+        <span class="text-h5">{{ localEditedItem.id ? "Edit User" : "New User" }}</span>
       </v-card-title>
       <v-card-text>
         <v-container>
           <v-row>
             <v-col cols="12">
-              <GenericTextField v-model="localEditedItem.name" label="Name" />
+              <GenericTextField v-model="localEditedItem.username" label="Username" :disabled="!!localEditedItem.id" />
+            </v-col>
+            <v-col cols="12" v-if="!localEditedItem.id">
+              <GenericTextField v-model="localEditedItem.password" label="Password" type="password" />
             </v-col>
             <v-col cols="12">
-              <GenericTextField v-model="localEditedItem.email" label="Email" />
-            </v-col>
-            <v-col cols="12">
-              <GenericTextField v-model="localEditedItem.dob" label="Date of Birth" type="date" />
-            </v-col>
-            <v-col cols="12">
-              <GenericTextField v-model="localEditedItem.age" label="Age" type="number" />
+              <v-select
+                v-model="localEditedItem.role"
+                :items="['admin', 'staff']"
+                label="Role"
+                outlined
+                dense
+              ></v-select>
             </v-col>
           </v-row>
         </v-container>
@@ -48,11 +49,9 @@ export default {
       type: Object,
       default: () => ({
         id: null,
-        name: "",
-        email: "",
-        dob: "",
-        age: "",
-        addresses: [],
+        username: "",
+        password: "",
+        role: "staff",
       }),
     },
   },
@@ -77,17 +76,9 @@ export default {
   methods: {
     save() {
       this.isLoading = true;
-      const userData = {
-        id: this.localEditedItem.id || String(Date.now()),
-        name: this.localEditedItem.name || "",
-        email: this.localEditedItem.email || "",
-        dob: this.localEditedItem.dob || "",
-        age: this.localEditedItem.age || "",
-        addresses: this.localEditedItem.addresses || [],
-      };
       setTimeout(() => {
         this.isLoading = false;
-        this.$emit("save", userData);
+        this.$emit("save", this.localEditedItem);
         this.$emit("update:dialog", false);
       }, 1000);
     },

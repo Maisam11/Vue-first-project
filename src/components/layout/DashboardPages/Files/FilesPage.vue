@@ -57,6 +57,9 @@
                   Created: {{ formatDate(sheet.createdAt) }} | Updated: {{ formatDate(sheet.updatedAt) }}
                 </v-list-item-subtitle>
               </v-list-item-content>
+              <v-list-item-action v-if="isAdmin">
+                <v-icon small @click.stop="openDialog(item)">mdi-cog</v-icon>
+              </v-list-item-action>
             </v-list-item>
             </v-list>
           </td>
@@ -68,10 +71,32 @@
         {{ formatDate(item.updatedAt) }}
       </template>
       <template v-slot:column-actions="{ item }">
-        <TableActions :item="item" 
-          :onEdit="canEditFiles ? openDialog : null" 
+       <div class="d-flex justify-content-center">
+        <div>
+          <TableActions :item="item" 
+          :onEdit="canEditFile(item) ? openDialog : null" 
           :onView="viewFile" 
-          :onDelete="canDeleteFiles ? openDeleteDialog : null" />
+          :onDelete="canDeleteFile(item) ? openDeleteDialog : null" />
+        </div>
+         <!-- share menu for admin -->
+         <div>
+          <v-menu bottom left v-if="isAdmin">
+           <template v-slot:activator="{ on, attrs }">
+             <v-btn icon v-bind="attrs" v-on="on" small class="ml-1">
+               <v-icon small color="info" title="share">mdi-share</v-icon>
+              </v-btn>
+           </template>
+           <v-list dense>
+              <v-list-item @click="openDialog(item)">
+               <v-list-item-icon>
+                 <v-icon small>mdi-cog</v-icon>
+               </v-list-item-icon>
+               <v-list-item-title>Manage Sharing</v-list-item-title>
+             </v-list-item>
+           </v-list>
+          </v-menu>
+         </div>
+       </div>
       </template>
     </GenericDataTable>
     <v-card>
@@ -137,8 +162,8 @@ export default {
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
         { text: "Created At", value: "createdAt", width: "200px", filterable: true, sortable: true },
         { text: "Updated At", value: "updatedAt", width: "200px", filterable: true, sortable: true },
-        { text: "Added By", value: "addedBy", width: "200px", filterable: true },
-        { text: "Actions", value: "actions", sortable: false, align: "center", width: "150px" },
+        { text: "Added By", value: "addedBy", width: "120px", filterable: true },
+        { text: "Actions", value: "actions", sortable: false, align: "center", width: "150px"},
       ],
       alphabeticalColumns: Array.from({ length: 26 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
@@ -150,19 +175,55 @@ export default {
   computed: {
     ...mapGetters("files", ["getFiles", "getFilteredFiles"]),
     ...mapGetters("roles", ["canUserPerformAction", "getCurrentUserRole"]),
+    ...mapGetters("auth", ["currentUser"]), 
     paginatedFiles() {
       const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
       const end = start + this.pagination.itemsPerPage;
       return this.getFilteredFiles.slice(start, end);
     },
+    isAdmin() {
+      return this.getCurrentUserRole === 'admin';
+    },
     canCreateFiles() {
-      return this.canUserPerformAction('files', 'create');
+      return this.canUserPerformAction('files', 'create') || this.isAdmin;
     },
     canEditFiles() {
-      return this.canUserPerformAction('files', 'update');
+      return this.canUserPerformAction('files', 'update') || this.isAdmin;
     },
     canDeleteFiles() {
-      return this.canUserPerformAction('files', 'delete');
+      return this.canUserPerformAction('files', 'delete') || this.isAdmin;
+    },
+    canEditFile() {
+      return (item) => {
+        return this.isAdmin || 
+               (item.addedBy === this.currentUser?.username) || 
+               ((item.editors || []).includes(this.currentUser?.uid));
+      };
+    },
+    
+    canDeleteFile() {
+      return (item) => {
+        return this.isAdmin || (item.addedBy === this.currentUser?.username);
+      };
+    },
+    
+    isViewerOnly() {
+      return (item) => {
+        if (this.isAdmin) return false;
+        if (item.addedBy === this.currentUser?.username) return false;
+        if ((item.editors || []).includes(this.currentUser?.uid)) return false;
+        // Check both old sharedWith and new viewers field for backward compatibility
+        return (item.viewers || []).includes(this.currentUser?.uid) || 
+               (item.sharedWith || []).includes(this.currentUser?.uid);
+      };
+    },
+    
+    isEditor() {
+      return (item) => {
+        if (this.isAdmin) return true;
+        return item.addedBy === this.currentUser?.username || 
+               (item.editors || []).includes(this.currentUser?.uid);
+      };
     }
   },
   watch: {
@@ -226,8 +287,8 @@ export default {
       );
     },
     openDialog(item) {
-      if (item && !this.canEditFiles) {
-        this.showNotification('You do not have permission to edit files', 'error');
+      if (item && !this.canEditFile(item) && !this.isAdmin) {
+        this.showNotification('You do not have permission to edit this file', 'error');
         return;
       }
       if (!item && !this.canCreateFiles) {
@@ -236,14 +297,21 @@ export default {
       }
       this.dialogDelete = false;
       this.editedItem = item
-        ? { ...item, sheets: item.sheets || [] }
+        ? { 
+            ...item, 
+            sheets: item.sheets || [], 
+            editors: item.editors || [],
+            viewers: item.viewers || item.sharedWith || []
+          }
         : {
             id: this.generateRandomId(),
             name: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             addedBy: this.$store.getters['auth/currentUser']?.username || 'Unknown',
-            sheets: []
+            sheets: [],
+            editors: [this.$store.getters['auth/currentUser']?.uid].filter(Boolean),
+            viewers: []
           };
       this.dialog = true;
     },
@@ -251,7 +319,7 @@ export default {
       return Math.random().toString(36).substring(2, 10);
     },
     openDeleteDialog(item) {
-      if (!this.canDeleteFiles) {
+      if (!this.canDeleteFile(item)) {
         this.showNotification('You do not have permission to delete files', 'error');
         return;
       }
@@ -343,7 +411,7 @@ export default {
       this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
       this.resetPagination();
     } catch (error) {
-      console.log('mounted: Error fetching files:', error.message);
+      console.error('mounted: Error fetching files:', error.message);
       this.showNotification('Error fetching files: ' + error.message, 'error');
     } finally {
       this.loading = false;

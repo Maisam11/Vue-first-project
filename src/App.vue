@@ -27,8 +27,6 @@ export default {
         this.$store.commit('roles/SET_CURRENT_USER_ROLE', null);
         console.log('App: No user authenticated');
       }
-    }, error => {
-      console.log('App: Auth state change error:', error.message);
     });
   },
 };

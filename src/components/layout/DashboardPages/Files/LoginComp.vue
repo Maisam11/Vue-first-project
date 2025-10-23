@@ -24,7 +24,6 @@
                 class="mb-2"
               ></v-text-field>
               <v-btn color="primary" type="submit" block>Login</v-btn>
-              <v-btn color="secondary" to="/register" block class="mt-2">Register</v-btn>
               <v-btn color="primary" text block class="mt-2" @click="showResetPasswordDialog = true">Forgot Password?</v-btn>
             </v-form>
             <v-alert

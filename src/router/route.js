@@ -22,7 +22,6 @@ import MorePage from "../components/layout/DashboardPages/practicePages/More.vue
 import FilesPage from "../components/layout/DashboardPages/Files/FilesPage.vue";
 import FileView from "../components/layout/DashboardPages/Files/FileView.vue";
 import LoginComp from '../components/layout/DashboardPages/Files/LoginComp.vue';
-import RegisterComp from '../components/layout/DashboardPages/Files/RegisterComp.vue';
 import store from '../store';
 
 Vue.use(Router);
@@ -47,7 +46,6 @@ const router = new Router({
         { path: "BlogComp", component: BlogComp },
         { path: "VueStepper", component: VueStepper },
         { path: "login", component: LoginComp, name: 'login' },
-        { path: "register", component: RegisterComp, name: 'register' },
       ],
     },
     {
@@ -57,6 +55,7 @@ const router = new Router({
         {
           path: "UserPage",
           component: UserPage,
+          meta: { requiresAuth: true, requiresAdmin: true },
         },
         {
           path: "More",
@@ -96,18 +95,12 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = store.getters['auth/isAuthenticated'];
   
   if (requiresAuth) {
-    console.log('Router: Checking authentication for protected route, isAuthenticated:', isAuthenticated);
     if (!isAuthenticated) {
-      console.log('Router: Redirecting to login, user not authenticated');
       next({ name: 'login', query: { redirect: to.fullPath } });
     } else {
       next();
     }
   } else if (to.name === 'login' && isAuthenticated) {
-    console.log('Router: Already authenticated, redirecting to Files');
-    next(to.query.redirect || '/UserDashboard/Files');
-  } else if (to.name === 'register' && isAuthenticated) {
-    console.log('Router: Already authenticated, redirecting to Files');
     next(to.query.redirect || '/UserDashboard/Files');
   } else {
     next();

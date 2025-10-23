@@ -37,13 +37,13 @@ export default {
     this.$emit("closeDialog");
   },
   confirmDelete() {
-    this.isLoading = true; // ✅ Loading start
+    this.isLoading = true;
 
     setTimeout(() => {
-      this.$emit("confirm"); // ✅ Parent component ko delete ka event bhejna
-      this.isLoading = false; // ✅ Loading stop after 1 sec
-      this.localDialog = false; // ✅ Dialog band karna
-    }, 1000); // 1 second ka delay
+      this.$emit("confirm");
+      this.isLoading = false; 
+      this.localDialog = false;
+    }, 1000);
   },
 },
 

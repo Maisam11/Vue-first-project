@@ -15,6 +15,10 @@
               <p><strong>Created At:</strong> {{ formatDate(localFile.createdAt) }}</p>
               <p><strong>Updated At:</strong> {{ formatDate(localFile.updatedAt) }}</p>
               <p><strong>Added By:</strong> {{ localFile.addedBy }}</p>
+              <p><strong>Your Access:</strong> 
+                <v-chip x-small v-if="isViewerOnly" color="info">View Only</v-chip>
+                <v-chip x-small v-else color="success">Can Edit</v-chip>
+              </p>
             </v-col>
             <v-col cols="12" md="6" v-if="localFile.sheets && localFile.sheets.length">
               <h3>Selected Sheet Metadata</h3>
@@ -24,7 +28,7 @@
             </v-col>
           </v-row>
           <h3>Sheets</h3>
-          <div class="d-flex mb-4">
+          <div class="d-flex mb-4" v-if="canEdit">
             <GenericButton color="primary" icon="mdi-plus" class="mr-2" @click="addNewSheet"> Sheet</GenericButton>
             <GenericButton icon="mdi-plus" @click="addRow" :disabled="!localFile.sheets || !localFile.sheets.length"> Row</GenericButton>
             <div v-if="selectedRows.length && localFile.sheets && localFile.sheets.length">
@@ -37,8 +41,8 @@
             <v-tab
               v-for="(sheet, index) in localFile.sheets"
               :key="sheet.name"
-              @dblclick="startEditingSheetName(index)"
-              @contextmenu.prevent="openDeleteSheetDialog(index)"
+              @dblclick="canEdit ? startEditingSheetName(index) : null"
+              @contextmenu.prevent="canEdit ? openDeleteSheetDialog(index) : null"
             >
               <template v-if="editingSheetIndex === index">
                 <v-text-field
@@ -62,17 +66,18 @@
                 :columns="alphabeticalColumns"
                 :editorRef="`sheetEditor${index}`"
                 :type="`sheet${index}`"
-                @update:value="updateSheetData(index, $event)"
+                @update:value="canEdit ? updateSheetData(index, $event) : null"
                 @select="handleRowSelection(index, $event)"
-                :enable-select="true"
-                :allow-add-col="true"
+                :enable-select="canEdit"
+                :allow-add-col="canEdit"
+                :readonly="!canEdit"
               />
             </v-tab-item>
           </v-tabs-items>
         </v-card-text>
         <v-card-actions>
           <GenericButton @click="$router.push('/UserDashboard/Files')">Back</GenericButton>
-          <GenericButton color="primary" @click="saveChanges">Save</GenericButton>
+          <GenericButton color="primary" @click="saveChanges" v-if="canEdit">Save</GenericButton>
         </v-card-actions>
       </v-card>
       <DeleteDialog :dialog="dialogDeleteSheet" @confirm="deleteSheetConfirm" @closeDialog="closeDeleteSheetDialog" />
@@ -87,7 +92,7 @@
 import GenericButton from "../../../common/GenericButton.vue"
 import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
 import DeleteDialog from "../modals/DeleteDialog.vue";
-import { mapActions } from "vuex";
+import { mapActions, mapGetters } from "vuex";
 
 export default {
   name: "FileView",
@@ -110,6 +115,27 @@ export default {
       })),
     };
   },
+  computed: {
+    ...mapGetters("auth", ["currentUser"]),
+    ...mapGetters("roles", ["getCurrentUserRole"]),
+    isAdmin() {
+      return this.getCurrentUserRole === 'admin';
+    },
+    isOwner() {
+      return this.localFile?.addedBy === this.currentUser?.username;
+    },
+    isEditor() {
+      return this.isAdmin || 
+             this.isOwner || 
+             (this.localFile?.editors || []).includes(this.currentUser?.uid);
+    },
+    isViewerOnly() {
+      return !this.isEditor && (this.localFile?.viewers || []).includes(this.currentUser?.uid);
+    },
+    canEdit() {
+      return this.isEditor && !this.isViewerOnly;
+    },
+  },
   methods: {
     ...mapActions("files", ["updateFile", "getFileById"]),
     formatDate(dateString) {
@@ -118,6 +144,7 @@ export default {
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     },
     addNewSheet() {
+      if (!this.canEdit) return;
       const sheets = this.localFile.sheets || [];
       const sheetsLength = sheets.length;
       const newSheetName = `Sheet ${sheetsLength + 1}`;
@@ -132,6 +159,7 @@ export default {
       this.localFile.updatedAt = new Date().toISOString();
     },
     updateSheetData(index, newData) {
+      if (!this.canEdit) return;
       const sheet = this.localFile.sheets[index];
       if (sheet) {
         sheet.data = newData.map(row => ({
@@ -143,6 +171,7 @@ export default {
       }
     },
     addRow() {
+      if (!this.canEdit) return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -157,7 +186,7 @@ export default {
       this.selectedRows = [];
     },
     addRowAbove() {
-      if (this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0) return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -179,7 +208,7 @@ export default {
       this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
     },
     addRowBelow() {
-      if (this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0) return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -208,7 +237,7 @@ export default {
         .map(idx => currentData[idx]._rowKey);
     },
     deleteSelectedRows() {
-      if (this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0) return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const currentData = sheet.data || [];
@@ -226,6 +255,7 @@ export default {
       this.dialogDeleteSheet = true;
     },
     deleteSheetConfirm() {
+      if (!this.canEdit) return;
       this.localFile.sheets.splice(this.sheetToDelete, 1);
       if (this.activeSheetTab >= this.localFile.sheets.length && this.localFile.sheets.length > 0) {
         this.activeSheetTab = this.localFile.sheets.length - 1;
@@ -262,11 +292,9 @@ export default {
       this.newSheetName = '';
     },
     async saveChanges() {
+      if (!this.canEdit) return;
       const updatedFile = await this.updateFile({ ...this.localFile });
       console.log('saveFile: Updated file', updatedFile);
-    },
-    generateRandomId() {
-      return Math.random().toString(36).substring(2, 10);
     },
   },
   async mounted() {

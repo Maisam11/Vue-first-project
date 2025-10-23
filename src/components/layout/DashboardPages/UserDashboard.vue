@@ -5,7 +5,7 @@
       <v-toolbar-title>User Dashboard</v-toolbar-title>
       <v-spacer />
       <v-list class="toolbar-menu d-flex bg-transparent">
-        <v-list-item v-for="(item, index) in toolbarItems" :key="index">
+        <v-list-item v-for="(item, index) in filteredToolbarItems" :key="index">
           <v-list-item-content>
             <router-link
               :id="item.title === 'User Table' ? 'user-table-tab' : null"
@@ -38,7 +38,7 @@
           <v-list dense>
             <h3 class="m-3">Dashboard</h3>
             <v-list-item
-              v-for="(item, index) in drawerItems"
+              v-for="(item, index) in filteredDrawerItems"
               :key="index"
               two-line
             >
@@ -140,6 +140,7 @@
 <script>
 import navigation from "@/components/mixins/navigation.js";
 import GenericTour from "@/components/common/GenericTour.vue";
+import { mapGetters } from "vuex";
 
 export default {
   name: "UserDashboard",
@@ -275,7 +276,23 @@ methods: {
       this.$router.push('/login');
     },
   },
-  computed: {
+computed: {
+    ...mapGetters("roles", ["getCurrentUserRole"]),
+    isAdmin() {
+      return this.getCurrentUserRole === 'admin';
+    },
+    filteredDrawerItems() {
+      return this.drawerItems.filter(item => {
+        if (item.title === 'User Table') return this.isAdmin;
+        return true;
+      });
+    },
+    filteredToolbarItems() {
+      return this.toolbarItems.filter(item => {
+        if (item.title === 'User Table') return this.isAdmin;
+        return true;
+      });
+    },
     contentClass() {
       return this.$vuetify.breakpoint.mdAndUp ? "ml-64" : "";
     },

@@ -2,10 +2,11 @@
   <div>
     <GenericDataTable
       :headers="headers"
-      :items="combinedUsers"
+      :items="getAllUsers"
       title="Users Table"
       :footerProps="footerProps"
       :showExpand="true"
+      :loading="loading"
     >
       <template v-slot:toolbar-actions>
         <GenericButton
@@ -13,27 +14,14 @@
           background
           @click="openDialog(null)"
           id="add-new-record-btn"
+          v-if="isAdmin"
         >
-          Add New Record
+          Add New User
         </GenericButton>
       </template>
 
       <template v-slot:column-actions="{ item }">
-        <TableActions :item="item" :onEdit="openDialog" :onView="openDialog" :onDelete="openDeleteDialog" />
-      </template>
-
-      <template v-slot:header-name="{ header }">
-        <div class="d-flex align-center">
-          <span>{{ header.text }}</span>
-          <v-icon small class="ml-1">mdi-account</v-icon>
-        </div>
-      </template>
-
-      <template v-slot:header-email="{ header }">
-        <div class="d-flex align-center">
-          <span>{{ header.text }}</span>
-          <v-icon small class="ml-1">mdi-email</v-icon>
-        </div>
+        <TableActions :item="item" :onEdit="openDialog" :onView="openDialog" :onDelete="canDeleteUser(item) ? openDeleteDialog : null" />
       </template>
     </GenericDataTable>
 
@@ -58,22 +46,17 @@ export default {
       dialog: false,
       dialogDelete: false,
       editedItem: null,
+      loading: false,
       footerProps: {
         showFirstLastPage: true,
         itemsPerPageOptions: [5, 10, 25],
       },
       headers: [
         {
-          text: "Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true,
+          text: "Username", value: "username", width: "200px", class: "font-weight-bold", filterable: true,
         },
         {
-          text: "Email", value: "email", width: "250px", filterable: true,
-        },
-        {
-          text: "Date of Birth", value: "dob", align: "center", width: "150px",
-        },
-        {
-          text: "Age", value: "age", align: "center", width: "100px",
+          text: "Role", value: "role", width: "150px", filterable: true,
         },
         {
           text: "Actions", value: "actions", sortable: false, align: "center", width: "150px",
@@ -82,49 +65,93 @@ export default {
     };
   },
   computed: {
-    ...mapGetters("users", ["getCombinedUserData"]),
-    combinedUsers() {
-      return this.getCombinedUserData || [];
+    ...mapGetters("roles", ["getAllUsers", "getCurrentUserRole", "canUserPerformAction"]),
+    ...mapGetters("auth", ["currentUser"]),
+    isAdmin() {
+      return this.getCurrentUserRole === 'admin';
     },
   },
   methods: {
-    ...mapActions("users", ["addUser", "updateUser", "updateFormSubmission", "deleteUser", "deleteFormSubmission"]),
+    ...mapActions("roles", ["createUser", "updateUserRole", "deleteUser", "fetchAllUsers"]),
     openDialog(item) {
       this.dialogDelete = false;
       this.editedItem = item
         ? { ...item }
-        : { id: Date.now(), name: "", email: "", dob: "", age: "", addresses: [], };
+        : { username: "", password: "", role: "staff" };
       this.dialog = true;
     },
     openDeleteDialog(item) {
+      if (!this.canDeleteUser(item)) return;
       this.dialog = false;
       this.editedItem = { ...item };
       this.dialogDelete = true;
     },
-    saveItem(editedItem) {
-      if (this.combinedUsers.find((u) => u.id === editedItem.id)) {
-        if (editedItem.isFormSubmission) {
-          this.updateFormSubmission(editedItem);
+    async saveItem(editedItem) {
+      try {
+        if (editedItem.id) {
+
+          await this.updateUserRole({ userId: editedItem.id, role: editedItem.role });
+          this.showNotification('User updated successfully');
+
+          await this.fetchAllUsers();
         } else {
-          this.updateUser(editedItem);
+
+          await this.createUser(editedItem);
+          this.showNotification('User created successfully');
+          
+
+          setTimeout(async () => {
+            await this.fetchAllUsers();
+          }, 500);
         }
-      } else {
-        this.addUser(editedItem);
+        this.dialog = false;
+      } catch (error) {
+        console.error('Error saving user:', error);
+        this.showNotification('Error saving user: ' + error.message, 'error');
       }
-      this.dialog = false;
     },
-    deleteItemConfirm() {
-      if (this.editedItem.isFormSubmission) {
-        this.deleteFormSubmission(this.editedItem.id);
-      } else {
-        this.deleteUser(this.editedItem.id);
+    async deleteItemConfirm() {
+      try {
+        await this.deleteUser(this.editedItem.id);
+        this.showNotification('User deleted successfully');
+        this.dialogDelete = false;
+
+        await this.fetchAllUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        this.showNotification('Error deleting user: ' + error.message, 'error');
       }
-      this.dialogDelete = false;
     },
     closeDialog() {
       this.dialog = false;
       this.dialogDelete = false;
     },
+    canDeleteUser(item) {
+      return this.isAdmin && !item.isDefault;
+    },
+    showNotification(message, type = 'success') {
+
+      if (type === 'success') {
+        this.$toast.success(message);
+      } else if (type === 'error') {
+        this.$toast.error(message);
+      } else {
+        this.$toast.info(message);
+      }
+    },
+  },
+  async mounted() {
+    if (this.isAdmin) {
+      this.loading = true;
+      try {
+        await this.fetchAllUsers();
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        this.showNotification('Error fetching users: ' + error.message, 'error');
+      } finally {
+        this.loading = false;
+      }
+    }
   },
 };
 </script>

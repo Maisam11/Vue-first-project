@@ -16,6 +16,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const firebaseConnector = getFirestore(app);
 const auth = getAuth(app);
+const adminApp = initializeApp(firebaseConfig, 'AdminApp');
+const adminAuth = getAuth(adminApp);
 console.log('[Firebase] Initialized with config:', firebaseConfig);
 
-export { firebaseConnector, app, auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail };
+export { firebaseConnector, app, auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, adminAuth };
