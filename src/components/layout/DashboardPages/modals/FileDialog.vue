@@ -14,19 +14,43 @@
         ></v-text-field>
         <v-select
           v-if="isAdmin"
-          v-model="localItem.viewers"
-          :items="staffUsers"
+          v-model="selectedUsers"
+          :items="availableStaffUsers"
           item-text="username"
           item-value="id"
-          label="Share With Staff (View Only)"
+          label="Share With Staff"
           multiple
           outlined
           dense
-          chips
-          small-chips
-          hint="Selected staff users will be able to view but not edit this file"
           persistent-hint
-        ></v-select>
+          @change="handleUserSelection" >
+        </v-select>
+
+        <div v-if="isAdmin && selectedUserDetails.length > 0" class="mt-4">
+          <v-list dense class="access-list">
+            <v-list-item v-for="user in selectedUserDetails" :key="user.id" class="access-list-item my-2" style=" border: 1px solid red;">
+              <v-icon small color="primary" size="32" class="mr-2">mdi-account</v-icon>
+              
+              <v-list-item-content class="py-1">
+                <v-list-item-title class="text-body-2 font-weight-medium">
+                  {{ user.username }}
+                </v-list-item-title>
+              </v-list-item-content>
+
+              <v-list-item-action class="mx-1 my-1" style="min-width: 120px;" >
+                <v-select v-model="userAccess[user.id]" :items="accessLevels" item-text="text" item-value="value" dense outlined 
+                 hide-details class="access-dropdown" @change="updateAccessLevel(user.id, $event)" >
+                </v-select>
+              </v-list-item-action>
+
+              <v-list-item-action class="my-0 ml-1">
+                <v-btn icon small @click="removeUser(user.id)" color="error" class="delete-btn" >
+                  <v-icon small>mdi-close</v-icon>
+                </v-btn>
+              </v-list-item-action>
+            </v-list-item>
+          </v-list>
+        </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -34,7 +58,7 @@
         <v-btn 
           color="blue darken-1" 
           text 
-          @click="$emit('save', localItem)" 
+          @click="saveFile" 
           :disabled="!localItem.name"
         >Save</v-btn>
       </v-card-actions>
@@ -55,6 +79,16 @@ export default {
     isAdmin() {
       return this.getCurrentUserRole === 'admin';
     },
+    availableStaffUsers() {
+      return this.staffUsers.filter(staff => 
+        !this.selectedUsers.includes(staff.id)
+      );
+    },
+    selectedUserDetails() {
+      return this.staffUsers.filter(user => 
+        this.selectedUsers.includes(user.id)
+      );
+    }
   },
   data() {
     return {
@@ -76,6 +110,12 @@ export default {
             viewers: []
           },
       staffUsers: [],
+      selectedUsers: [],
+      userAccess: {},
+      accessLevels: [
+        { text: 'View Only', value: 'view' },
+        { text: 'Edit Only', value: 'edit' }
+      ],
     };
   },
   methods: {
@@ -94,7 +134,70 @@ export default {
       if (this.isAdmin) {
         const users = await this.fetchAllUsers();
         this.staffUsers = users.filter(u => u.role === 'staff');
+
+        if (this.editedItem && this.editedItem.id) {
+          this.selectedUsers = [
+            ...(this.localItem.editors || []),
+            ...(this.localItem.viewers || [])
+          ].filter((id, index, self) => 
+            id !== this.$store.getters['auth/currentUser']?.uid &&
+            self.indexOf(id) === index
+          );
+          this.initializeUserAccess();
+        }
       }
+    },
+
+    initializeUserAccess() {
+      this.userAccess = {};
+      (this.localItem.editors || []).forEach(userId => {
+        if (userId !== this.$store.getters['auth/currentUser']?.uid) {
+          this.userAccess[userId] = 'edit';
+        }
+      });
+ 
+      (this.localItem.viewers || []).forEach(userId => {
+        this.userAccess[userId] = 'view';
+      });
+
+      this.selectedUsers.forEach(userId => {
+        if (!this.userAccess[userId]) {
+          this.userAccess[userId] = 'view';
+        }
+      });
+    },
+    handleUserSelection(selectedUserIds) {
+      this.selectedUsers = [...selectedUserIds];
+      
+      selectedUserIds.forEach(userId => {
+        if (!this.userAccess[userId]) {
+          this.userAccess[userId] = 'view';
+        }
+      });
+    },
+    updateAccessLevel(userId, accessLevel) {
+      this.userAccess[userId] = accessLevel;
+    },
+    removeUser(userId) {
+      this.selectedUsers = this.selectedUsers.filter(id => id !== userId);
+      delete this.userAccess[userId];
+    },
+    saveFile() {
+      const editors = [this.$store.getters['auth/currentUser']?.uid].filter(Boolean); // Creator always editor
+      const viewers = [];
+
+      Object.keys(this.userAccess).forEach(userId => {
+        if (this.userAccess[userId] === 'edit') {
+          editors.push(userId);
+        } else if (this.userAccess[userId] === 'view') {
+          viewers.push(userId);
+        }
+      });
+
+      this.localItem.editors = [...new Set(editors)];
+      this.localItem.viewers = [...new Set(viewers)];
+
+      this.$emit('save', this.localItem);
     },
   },
   watch: {
@@ -122,7 +225,28 @@ export default {
             editors: [this.$store.getters['auth/currentUser']?.uid].filter(Boolean),
             viewers: []
           };
+
+      if (!newVal || !newVal.id) {
+        this.selectedUsers = [];
+        this.userAccess = {};
+      } else {
+        this.$nextTick(() => {
+          this.loadStaffUsers();
+        });
+      }
+    },
+    selectedUsers(newSelectedUsers) {  
+      Object.keys(this.userAccess).forEach(userId => {
+        if (!newSelectedUsers.includes(userId)) {
+          delete this.userAccess[userId];
+        }
+      });
     },
   },
 };
 </script>
+<style scoped>
+.access-dropdown {
+  font-size: 0.8rem;
+}
+</style>

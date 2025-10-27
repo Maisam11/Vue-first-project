@@ -81,19 +81,11 @@
          <!-- share menu for admin -->
          <div>
           <v-menu bottom left v-if="isAdmin">
-           <template v-slot:activator="{ on, attrs }">
-             <v-btn icon v-bind="attrs" v-on="on" small class="ml-1">
-               <v-icon small color="info" title="share">mdi-share</v-icon>
-              </v-btn>
+           <template v-slot:activator="{}">
+            <v-btn v-if="isAdmin" icon small class="ml-1" @click="openDialog(item)" title="Share File" >
+             <v-icon small color="info">mdi-share</v-icon>
+           </v-btn>
            </template>
-           <v-list dense>
-              <v-list-item @click="openDialog(item)">
-               <v-list-item-icon>
-                 <v-icon small>mdi-cog</v-icon>
-               </v-list-item-icon>
-               <v-list-item-title>Manage Sharing</v-list-item-title>
-             </v-list-item>
-           </v-list>
           </v-menu>
          </div>
        </div>
@@ -212,7 +204,6 @@ export default {
         if (this.isAdmin) return false;
         if (item.addedBy === this.currentUser?.username) return false;
         if ((item.editors || []).includes(this.currentUser?.uid)) return false;
-        // Check both old sharedWith and new viewers field for backward compatibility
         return (item.viewers || []).includes(this.currentUser?.uid) || 
                (item.sharedWith || []).includes(this.currentUser?.uid);
       };

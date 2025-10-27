@@ -106,30 +106,29 @@ export default {
       throw error;
     }
   },
-  async updateFile({ commit, dispatch }, file) {
+  async updateFile({ commit, dispatch, rootGetters }, file) {
     try {
-      const currentUser = this.$store?.getters['auth/currentUser'];
+      const currentUser = rootGetters['auth/currentUser'];
       const fileData = {
         name: file.name,
         createdAt: file.createdAt,
-        updatedAt: file.updatedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         addedBy: file.addedBy,
         sharedWith: file.viewers || [],
-        editors: file.addedBy === currentUser?.username ? 
-          [currentUser?.uid, ...(file.editors || [])].filter(Boolean) : 
-          file.editors || [],
+        editors: file.editors || [],
         viewers: file.viewers || [],
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
       };
       console.log('updateFile: Updating file with data:', fileData);
-      
-      await dispatch('firebase/update', { collectionPath, id: file.id, data: fileData }, { root: true });
-   
+      console.log('updateFile: Current user:', currentUser);
+      console.log('updateFile: User in editors array?', fileData.editors.includes(currentUser?.uid));  
+      await dispatch('firebase/update', { collectionPath: '78910-files', id: file.id, data: fileData }, { root: true });
+
+      if (file.sheets && file.sheets.length > 0) {
       const existingSheetNames = fileData.sheetNames || [];
       for (const sheetName of existingSheetNames) {
         await dispatch('deleteSheet', { fileId: file.id, sheetName });
       }
-      if (file.sheets && file.sheets.length > 0) {
         for (const sheet of file.sheets) {
           const sheetData = {
             createdAt: sheet.createdAt || new Date().toISOString(),
