@@ -101,7 +101,7 @@ export default {
         this.dialog = false;
         this.appointment = { date: "", description: "" };
         this.isLoading = false;
-      }, 1000);
+      }, 500);
           
       }
 

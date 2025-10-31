@@ -7,7 +7,7 @@ export default {
       files: ['create', 'read', 'update', 'delete'],
     },
     staff: {
-      files: ['create', 'read', 'update'],
+      files: ['create', 'read', 'update', 'delete'],
     }
   }
 };

@@ -43,7 +43,7 @@ export default {
       this.$emit("confirm");
       this.isLoading = false; 
       this.localDialog = false;
-    }, 1000);
+    }, 500);
   },
 },
 

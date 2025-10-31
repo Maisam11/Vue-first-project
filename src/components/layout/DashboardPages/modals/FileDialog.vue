@@ -13,22 +13,21 @@
           ref="fileNameInput"
         ></v-text-field>
         <v-select
-          v-if="isAdmin"
+          v-if="canShare"
           v-model="selectedUsers"
           :items="availableStaffUsers"
           item-text="username"
           item-value="id"
           label="Share With Staff"
           multiple
-          outlined
           dense
           persistent-hint
           @change="handleUserSelection" >
         </v-select>
 
-        <div v-if="isAdmin && selectedUserDetails.length > 0" class="mt-4">
+        <div v-if="canShare && selectedUserDetails.length > 0" >
           <v-list dense class="access-list">
-            <v-list-item v-for="user in selectedUserDetails" :key="user.id" class="access-list-item my-2" style=" border: 1px solid red;">
+            <v-list-item v-for="user in selectedUserDetails" :key="user.id" class="access-list-item my-2" style=" border-bottom: 1px solid black;">
               <v-icon small color="primary" size="32" class="mr-2">mdi-account</v-icon>
               
               <v-list-item-content class="py-1">
@@ -37,9 +36,9 @@
                 </v-list-item-title>
               </v-list-item-content>
 
-              <v-list-item-action class="mx-1 my-1" style="min-width: 120px;" >
-                <v-select v-model="userAccess[user.id]" :items="accessLevels" item-text="text" item-value="value" dense outlined 
-                 hide-details class="access-dropdown" @change="updateAccessLevel(user.id, $event)" >
+              <v-list-item-action class="mx-1 my-1" style="max-width: 120px;" >
+                <v-select v-model="userAccess[user.id]" :items="accessLevels" item-text="text" item-value="value" dense 
+                 hide-details class="access-dropdown" @change="updateAccessLevel(user.id, $event)">
                 </v-select>
               </v-list-item-action>
 
@@ -76,8 +75,15 @@ export default {
   },
   computed: {
     ...mapGetters("roles", ["getCurrentUserRole"]),
+    ...mapGetters("auth", ["currentUser"]),
     isAdmin() {
       return this.getCurrentUserRole === 'admin';
+    },
+    isCreator() {
+      return this.editedItem && this.editedItem.addedBy === this.currentUser?.username;
+    },
+    canShare() {
+      return this.isAdmin || this.isCreator;
     },
     availableStaffUsers() {
       return this.staffUsers.filter(staff => 
@@ -131,7 +137,7 @@ export default {
       });
     },
     async loadStaffUsers() {
-      if (this.isAdmin) {
+      if (this.canShare) {
         const users = await this.fetchAllUsers();
         this.staffUsers = users.filter(u => u.role === 'staff');
 
@@ -183,7 +189,7 @@ export default {
       delete this.userAccess[userId];
     },
     saveFile() {
-      const editors = [this.$store.getters['auth/currentUser']?.uid].filter(Boolean); // Creator always editor
+      const editors = [this.$store.getters['auth/currentUser']?.uid].filter(Boolean);
       const viewers = [];
 
       Object.keys(this.userAccess).forEach(userId => {
@@ -245,6 +251,7 @@ export default {
   },
 };
 </script>
+
 <style scoped>
 .access-dropdown {
   font-size: 0.8rem;

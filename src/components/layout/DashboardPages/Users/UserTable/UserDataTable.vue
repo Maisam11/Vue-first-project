@@ -102,7 +102,7 @@ export default {
 
           setTimeout(async () => {
             await this.fetchAllUsers();
-          }, 500);
+          }, 100);
         }
         this.dialog = false;
       } catch (error) {

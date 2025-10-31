@@ -78,15 +78,11 @@
           :onView="viewFile" 
           :onDelete="canDeleteFile(item) ? openDeleteDialog : null" />
         </div>
-         <!-- share menu for admin -->
+         <!-- share menu -->
          <div>
-          <v-menu bottom left v-if="isAdmin">
-           <template v-slot:activator="{}">
-            <v-btn v-if="isAdmin" icon small class="ml-1" @click="openDialog(item)" title="Share File" >
-             <v-icon small color="info">mdi-share</v-icon>
-           </v-btn>
-           </template>
-          </v-menu>
+          <v-btn v-if="isAdmin || isCreator(item)" icon small class="ml-1" @click="openDialog(item)" title="Share File" >
+            <v-icon small color="info">mdi-share</v-icon>
+          </v-btn>
          </div>
        </div>
       </template>
@@ -196,6 +192,12 @@ export default {
     canDeleteFile() {
       return (item) => {
         return this.isAdmin || (item.addedBy === this.currentUser?.username);
+      };
+    },
+    
+    isCreator() {
+      return (item) => {
+        return item.addedBy === this.currentUser?.username;
       };
     },
     
@@ -360,7 +362,7 @@ export default {
         return;
       }
       const wb = XLSX.utils.book_new();
-      let hasData = false;
+      let hasData = true;
       for (const file of this.getFilteredFiles) {
         const sheets = file.sheets || [];
         for (const sheet of sheets) {

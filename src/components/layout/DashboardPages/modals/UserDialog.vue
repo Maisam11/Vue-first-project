@@ -80,7 +80,7 @@ export default {
         this.isLoading = false;
         this.$emit("save", this.localEditedItem);
         this.$emit("update:dialog", false);
-      }, 1000);
+      }, 500);
     },
     closeDialog() {
       this.$emit("closeDialog");

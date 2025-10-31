@@ -21,11 +21,21 @@ export default {
   async fetchAllUsers({ commit, dispatch, rootGetters }) {
     try {
       const currentRole = rootGetters['roles/getCurrentUserRole'];
-      if (currentRole !== 'admin') {
-        console.log('fetchAllUsers: Non-admin user attempted to fetch all users');
+      const currentUser = rootGetters['auth/currentUser'];
+      
+      if (currentRole !== 'admin' && currentRole !== 'staff') {
+        console.log('fetchAllUsers: Non-admin/staff user attempted to fetch all users');
         return [];
       }
       const users = await dispatch('firebase/getAll', { collectionPath: 'users' }, { root: true });
+      if (currentRole === 'staff') {
+        const filteredUsers = users.filter(user => 
+          user.role === 'staff' && user.id !== currentUser?.uid
+        );
+        console.log('fetchAllUsers: Filtered staff users for sharing:', filteredUsers);
+        commit('SET_ALL_USERS', filteredUsers);
+        return filteredUsers;
+      }
       console.log('fetchAllUsers: Fetched users from Firebase:', users);
       commit('SET_ALL_USERS', users);
       return users;
