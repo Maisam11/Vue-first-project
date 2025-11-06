@@ -12,7 +12,7 @@
       :field="column.field"
       :label="column.label"
       :type="column.type"
-      :readonly="column.readonly"
+      :readonly="column.readonly || readonly"
       :width="column.width" />
   </vue-excel-editor>
 </template>
@@ -45,23 +45,39 @@ export default {
       type: Boolean,
       default: false,
     },
+    readonly: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
       localData: [],
+      isUpdating: false,
     };
   },
   watch: {
     value: {
       handler(newData) {
-        this.localData = [...newData];
+        if (!this.isUpdating) {
+          console.log('External data update received:', newData);
+          this.localData = JSON.parse(JSON.stringify(newData));
+        }
       },
       deep: true,
       immediate: true,
     },
     localData: {
       handler(newData) {
-        this.$emit('input', newData);
+        if (!this.isUpdating) {
+          console.log('Emitting data changes:', newData);
+          this.isUpdating = true;
+          this.$emit('input', JSON.parse(JSON.stringify(newData)));
+          this.$emit('update:value', JSON.parse(JSON.stringify(newData)));
+          setTimeout(() => {
+            this.isUpdating = false;
+          }, 0);
+        }
       },
       deep: true,
     }

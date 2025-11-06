@@ -25,4 +25,13 @@ export default {
   SET_SYNCED(state, val) {
     state.synced = val;
   },
+  ADD_FILE_HISTORY(state, history) {
+    state.fileHistories.push({ ...history });
+  },
+  SET_FILE_HISTORIES(state, histories) {
+    state.fileHistories = histories;
+  },
+  DELETE_FILE_HISTORY(state, historyId) {
+    state.fileHistories = state.fileHistories.filter(history => history.id !== historyId);
+  },
 };

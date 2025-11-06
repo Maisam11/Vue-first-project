@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs } from 'firebase/firestore';
 const collectionPath = '78910-files';
 const subCollectionPath = 'sheets';
+const historyCollectionPath = 'file_histories';
 
 export default {
   async fetchFiles({ commit, dispatch, rootGetters }) {
@@ -83,7 +84,9 @@ export default {
         sharedWith: file.viewers || [],
         editors: [currentUser?.uid, ...(file.editors || [])].filter(Boolean),
         viewers: file.viewers || [],
-        sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
+        sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
+        currentVersion: 1,
+        lastSaved: new Date().toISOString()
       };
       console.log('addFile: Creating file with data:', fileData);
       await dispatch('firebase/create', { collectionPath, id: file.id, data: fileData }, { root: true });
@@ -95,6 +98,14 @@ export default {
             data: sheet.data || []
           };
           await dispatch('setSheet', { fileId: file.id, sheetName: sheet.name, data: sheetData });
+          await dispatch('createFileHistory', {
+            fileId: file.id,
+            sheetName: sheet.name,
+            data: sheet.data || [],
+            version: 1,
+            changeType: 'created',
+            changedBy: currentUser?.username || 'Unknown'
+          });
         }
       }
       const newFile = { ...file, ...fileData };
@@ -117,7 +128,9 @@ export default {
         sharedWith: file.viewers || [],
         editors: file.editors || [],
         viewers: file.viewers || [],
-        sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : []
+        sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
+        currentVersion: file.currentVersion || 1,
+        lastSaved: new Date().toISOString()
       };
       console.log('updateFile: Updating file with data:', fileData);
       console.log('updateFile: Current user:', currentUser);
@@ -125,21 +138,34 @@ export default {
       await dispatch('firebase/update', { collectionPath: '78910-files', id: file.id, data: fileData }, { root: true });
 
       if (file.sheets && file.sheets.length > 0) {
-      const existingSheetNames = fileData.sheetNames || [];
-      for (const sheetName of existingSheetNames) {
+      const currentSheets = await dispatch('getSheets', { fileId: file.id });
+      const currentSheetNames = currentSheets.map(sheet => sheet.id);
+      const newSheetNames = file.sheets.map(sheet => sheet.name);
+      
+      for (const sheetName of currentSheetNames) {
+        if (!newSheetNames.includes(sheetName)) {
+          console.log('Deleting removed sheet:', sheetName);
         await dispatch('deleteSheet', { fileId: file.id, sheetName });
+        }
       }
         for (const sheet of file.sheets) {
           const sheetData = {
             createdAt: sheet.createdAt || new Date().toISOString(),
-            updatedAt: sheet.updatedAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             data: sheet.data || []
           };
           await dispatch('setSheet', { fileId: file.id, sheetName: sheet.name, data: sheetData });
         }
+    } else {
+      const currentSheets = await dispatch('getSheets', { fileId: file.id });
+      for (const sheet of currentSheets) {
+        console.log('Deleting all sheets:', sheet.id);
+        await dispatch('deleteSheet', { fileId: file.id, sheetName: sheet.id });
       }
-      commit('UPDATE_FILE', { ...file, ...fileData });
-      return { ...file, ...fileData };
+    }
+    const updatedFile = { ...file, ...fileData };
+    commit('UPDATE_FILE', updatedFile);
+    return updatedFile;
     } catch (error) {
       console.error('updateFile: Error:', error.code, error.message);
       console.error('updateFile: Error details:', error);
@@ -217,9 +243,137 @@ export default {
     try {
       const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
       await dispatch('firebase/delete', { collectionPath: sheetsPath, id: sheetName }, { root: true });
+    console.log('Sheet deleted successfully:', sheetName);
+    return sheetName;
+  } catch (error) {
+    console.error('deleteSheet: Error:', error.code, error.message);
+    if (error.code === 'not-found') {
+      console.log('Sheet already deleted:', sheetName);
       return sheetName;
+    }
+    throw error;
+  }
+},
+  async createFileHistory({ commit, dispatch }, { fileId, sheetName, data, version, changeType, changedBy }) {
+    try {
+      const historyId = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const historyData = {
+        id: historyId,
+        fileId,
+        sheetName,
+        data: JSON.parse(JSON.stringify(data)), 
+        version,
+        timestamp: new Date().toISOString(),
+        changedBy,
+        changeType
+      };
+      await dispatch('firebase/create', { 
+        collectionPath: historyCollectionPath, 
+        id: historyId, 
+        data: historyData 
+      }, { root: true });
+      
+      commit('ADD_FILE_HISTORY', historyData);
+      return historyData;
     } catch (error) {
-      console.error('deleteSheet: Error:', error.code, error.message);
+      console.error('createFileHistory: Error:', error);
+      throw error;
+    }
+  },
+  async fetchFileHistories({ commit, dispatch }, fileId) {
+    try {
+      const histories = await dispatch('firebase/getAll', { collectionPath: historyCollectionPath }, { root: true });
+      const fileHistories = histories.filter(history => history.fileId === fileId);
+      commit('SET_FILE_HISTORIES', fileHistories);
+      return fileHistories;
+    } catch (error) {
+      console.error('fetchFileHistories: Error:', error);
+      return [];
+    }
+  },
+  async revertToHistory({ dispatch, rootGetters, commit }, { fileId, historyId }) {
+    try {
+      const currentUser = rootGetters['auth/currentUser'];
+      console.log('=== STARTING REVERT PROCESS ===');
+      console.log('File ID:', fileId);
+      console.log('History ID:', historyId);
+      if (!fileId || !historyId) {
+        throw new Error('File ID and History ID are required');
+      }
+      const history = await dispatch('firebase/getById', { 
+        collectionPath: historyCollectionPath, 
+        id: historyId 
+      }, { root: true });
+      if (!history) {
+        throw new Error('History not found');
+      }
+      console.log('History record found:', history);
+      const currentFile = await dispatch('firebase/getById', { 
+        collectionPath, 
+        id: fileId 
+      }, { root: true });
+
+      if (!currentFile) {
+        throw new Error('File not found');
+      }
+      console.log('Current file found:', currentFile);
+      let historicalData = [];
+      if (Array.isArray(history.data)) {
+        historicalData = history.data;
+      } else if (history.data && Array.isArray(history.data.data)) {
+        historicalData = history.data.data;
+      } else if (history.data && history.data.data) {
+        historicalData = history.data.data;
+      } else {
+        historicalData = history.data || [];
+      }
+      console.log('Historical data extracted:', historicalData);
+      const updatedSheetData = {
+        data: historicalData,
+        updatedAt: new Date().toISOString()
+      };
+      if (history.data && history.data.createdAt) {
+        updatedSheetData.createdAt = history.data.createdAt;
+      }
+      console.log('Sheet data to update:', updatedSheetData);
+      console.log('Updating sheet in Firebase...');
+      await dispatch('setSheet', {
+        fileId,
+        sheetName: history.sheetName,
+        data: updatedSheetData
+      });
+      const newVersion = (currentFile.currentVersion || 0) + 1;
+      const updatedFileData = {
+        ...currentFile,
+        updatedAt: new Date().toISOString(),
+        currentVersion: newVersion,
+        lastSaved: new Date().toISOString()
+      };
+      console.log('Updating file metadata:', updatedFileData);
+      await dispatch('firebase/update', { 
+        collectionPath, 
+        id: fileId, 
+        data: updatedFileData 
+      }, { root: true });
+      console.log('Creating revert history entry...');
+      await dispatch('createFileHistory', {
+        fileId,
+        sheetName: history.sheetName,
+        data: historicalData,
+        version: newVersion,
+        changeType: 'reverted',
+        changedBy: currentUser?.username || 'Unknown'
+      });
+      console.log('Refreshing file data...');
+      const refreshedFile = await dispatch('getFileById', fileId);
+      if (refreshedFile) {
+        commit('UPDATE_FILE', refreshedFile);
+        console.log('File updated in local state');
+      }
+      console.log('=== REVERT COMPLETED SUCCESSFULLY ===');
+      return history;
+    } catch (error) {
+      console.error('revertToHistory: Error:', error);
       throw error;
     }
   },

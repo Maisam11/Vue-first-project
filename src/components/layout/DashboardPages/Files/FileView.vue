@@ -4,30 +4,39 @@
       <v-progress-circular indeterminate color="primary"></v-progress-circular>
     </v-container>
     <v-container v-else-if="localFile">
+      <div class="d-flex justify-space-between align-center mb-4">
       <h2>File Details: {{ localFile.name }}</h2>
+        <div class="d-flex align-center">
+          <span class="last-saved mr-3" v-if="localFile.lastSaved">
+            Last saved: {{ formatTime(localFile.lastSaved) }}
+          </span>
+          <GenericButton icon="mdi-history" @click="openHistoryDialog" title="View History" class="mr-2"> History </GenericButton>
+        </div>
+      </div>
       <v-card>
         <v-card-text>
           <v-row>
             <v-col cols="12" md="6">
               <h3>File Metadata</h3>
-              <p><strong>File ID:</strong> {{ localFile.id }}</p>
-              <p><strong>File Name:</strong> {{ localFile.name }}</p>
-              <p><strong>Created At:</strong> {{ formatDate(localFile.createdAt) }}</p>
-              <p><strong>Updated At:</strong> {{ formatDate(localFile.updatedAt) }}</p>
-              <p><strong>Added By:</strong> {{ localFile.addedBy }}</p>
-              <p><strong>Your Access:</strong> 
+              <ul style="list-style: none; margin-left: -1.2rem;">
+                <li><strong>File ID:</strong> {{ localFile.id }}</li>                
+                <li><strong>Current Version:</strong> {{ localFile.currentVersion || 1 }}</li>
+                <li><strong>Your Access:</strong> 
                 <v-chip x-small v-if="isViewerOnly" color="info">View Only</v-chip>
-                <v-chip x-small v-else color="success">Can Edit</v-chip>
-              </p>
+                <v-chip x-small v-else color="success">Can Edit</v-chip></li>
+              </ul>
             </v-col>
             <v-col cols="12" md="6" v-if="localFile.sheets && localFile.sheets.length">
               <h3>Selected Sheet Metadata</h3>
-              <p><strong>Sheet Name:</strong> {{ localFile.sheets[activeSheetTab]?.name || 'N/A' }}</p>
-              <p><strong>Created At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.createdAt) || 'N/A' }}</p>
-              <p><strong>Updated At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.updatedAt) || 'N/A' }}</p>
+              <ul style="list-style: none; margin-left: -1.2rem">
+                <li><strong>Sheet Name:</strong> {{ localFile.sheets[activeSheetTab]?.name || 'N/A' }}</li>
+                <li><strong>Created At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.createdAt) || 'N/A' }}</li>
+                <li><strong>Updated At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.updatedAt) || 'N/A' }}</li>
+              </ul>
             </v-col>
           </v-row>
           <h3>Sheets</h3>
+          <div class="d-flex justify-content-between">
           <div class="d-flex mb-4" v-if="canEdit">
             <GenericButton color="primary" icon="mdi-plus" class="mr-2" @click="addNewSheet"> Sheet</GenericButton>
             <GenericButton icon="mdi-plus" @click="addRow" :disabled="!localFile.sheets || !localFile.sheets.length"> Row</GenericButton>
@@ -35,6 +44,13 @@
               <GenericButton icon="mdi-arrow-up" @click="addRowAbove"> Row</GenericButton>
               <GenericButton icon="mdi-arrow-down" @click="addRowBelow">Row</GenericButton>
               <GenericButton icon="mdi-delete" color="error" @click="deleteSelectedRows"> Row</GenericButton>
+              </div>
+            </div>
+            <div>
+              <v-card-actions>
+                <GenericButton color="primary" @click="manualSave" v-if="canEdit">Save Version</GenericButton>
+                <GenericButton @click="$router.push('/UserDashboard/Files')">Back</GenericButton>
+              </v-card-actions>
             </div>
           </div>
           <v-tabs v-model="activeSheetTab" class="mb-4">
@@ -66,7 +82,7 @@
                 :columns="alphabeticalColumns"
                 :editorRef="`sheetEditor${index}`"
                 :type="`sheet${index}`"
-                @update:value="canEdit ? updateSheetData(index, $event) : null"
+                @input="handleSheetDataUpdate(index, $event)"
                 @select="handleRowSelection(index, $event)"
                 :enable-select="canEdit"
                 :allow-add-col="canEdit"
@@ -75,12 +91,10 @@
             </v-tab-item>
           </v-tabs-items>
         </v-card-text>
-        <v-card-actions>
-          <GenericButton @click="$router.push('/UserDashboard/Files')">Back</GenericButton>
-          <GenericButton color="primary" @click="saveChanges" v-if="canEdit">Save</GenericButton>
-        </v-card-actions>
       </v-card>
-      <DeleteDialog :dialog="dialogDeleteSheet" @confirm="deleteSheetConfirm" @closeDialog="closeDeleteSheetDialog" />
+      <FileHistoryDialog v-model="historyDialog" :file="localFile" @reverted="handleHistoryReverted" />
+      <DeleteDialog :dialog="dialogDeleteSheet" @confirm="deleteSheetConfirm" @closeDialog="closeDeleteSheetDialog" title="Delete Sheet"
+        message="Are you sure you want to delete this sheet? This action cannot be undone." />
     </v-container>
     <v-container v-else>
       <p>File not found.</p>
@@ -92,11 +106,12 @@
 import GenericButton from "../../../common/GenericButton.vue"
 import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
 import DeleteDialog from "../modals/DeleteDialog.vue";
+import FileHistoryDialog from "../modals/FileHistoryDialog.vue";
 import { mapActions, mapGetters } from "vuex";
 
 export default {
   name: "FileView",
-  components: { GenericExcelSheet, DeleteDialog, GenericButton },
+  components: { GenericExcelSheet, DeleteDialog, GenericButton, FileHistoryDialog },
   data() {
     return {
       activeSheetTab: 0,
@@ -107,6 +122,12 @@ export default {
       loading: true,
       editingSheetIndex: null,
       newSheetName: '',
+      historyDialog: false,
+      hasUnsavedChanges: false,
+      sessionStartData: null,
+      isNewSession: true,
+      hasRealChanges: false,
+      isSavingFinalVersion: false,
       alphabeticalColumns: Array.from({ length: 7 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
         title: String.fromCharCode(65 + i),
@@ -137,11 +158,23 @@ export default {
     },
   },
   methods: {
-    ...mapActions("files", ["updateFile", "getFileById"]),
+    ...mapActions("files", ["updateFile", "getFileById", "createFileHistory"]),
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    },
+    formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString();
+    },
+    handleUserChange() {
+      this.hasUnsavedChanges = true;
+      this.hasRealChanges = true;
+      if (this.isNewSession) {
+        this.startNewSession();
+      }
     },
     addNewSheet() {
       if (!this.canEdit) return;
@@ -157,17 +190,87 @@ export default {
       this.localFile.sheets.push(newSheet);
       this.activeSheetTab = sheetsLength;
       this.localFile.updatedAt = new Date().toISOString();
+      this.handleUserChange();
     },
-    updateSheetData(index, newData) {
+    handleSheetDataUpdate(index, newData) {
       if (!this.canEdit) return;
+      console.log('Sheet data updated - processing:', newData);
       const sheet = this.localFile.sheets[index];
       if (sheet) {
-        sheet.data = newData.map(row => ({
+        const clonedData = JSON.parse(JSON.stringify(newData));       
+        sheet.data = clonedData.map(row => ({
           ...row,
           _rowKey: row._rowKey || String(Date.now() + Math.random()),
         }));
         sheet.updatedAt = new Date().toISOString();
         this.localFile.updatedAt = new Date().toISOString();
+        this.handleUserChange();
+      }
+    },
+    startNewSession() {
+      if (this.localFile?.sheets && this.localFile.sheets[this.activeSheetTab]) {
+        const currentSheet = this.localFile.sheets[this.activeSheetTab];
+        this.sessionStartData = JSON.parse(JSON.stringify(currentSheet.data || []));
+        this.isNewSession = false;
+        this.hasRealChanges = false;
+        console.log('New editing session started with initial data:', this.sessionStartData);
+      }
+    },
+    async manualSave() {
+      await this.performFinalSave(true);
+    },
+    async performFinalSave(showNotification = false) {
+      if (!this.canEdit || this.isSavingFinalVersion) return;
+      try {
+        this.isSavingFinalVersion = true;
+        
+        console.log('Performing FINAL save with HISTORY...');
+        const currentSheet = this.localFile.sheets[this.activeSheetTab];
+        if (currentSheet && currentSheet.data && this.hasRealChanges) {
+          console.log('Creating history version...');
+          const newVersion = (this.localFile.currentVersion || 0) + 1;
+          await this.createFileHistory({
+            fileId: this.localFile.id,
+            sheetName: currentSheet.name,
+            data: currentSheet.data,
+            version: newVersion,
+            changeType: 'updated',
+            changedBy: this.currentUser?.username || 'Unknown'
+          });
+          console.log('History version created:', newVersion);
+          const fileToUpdate = {
+            ...this.localFile,
+            currentVersion: newVersion,
+            updatedAt: new Date().toISOString(),
+            lastSaved: new Date().toISOString()
+          };
+          const updatedFile = await this.updateFile(fileToUpdate);
+          this.localFile = updatedFile;
+        } else {
+          console.log('No real changes detected, performing regular save');
+          const fileToUpdate = {
+            ...this.localFile,
+            updatedAt: new Date().toISOString(),
+            lastSaved: new Date().toISOString()
+          };
+          const updatedFile = await this.updateFile(fileToUpdate);
+          this.localFile = updatedFile;
+        }
+        
+        this.hasUnsavedChanges = false;
+        this.isNewSession = true;
+        this.sessionStartData = null;
+        this.hasRealChanges = false;
+        this.isSavingFinalVersion = false;
+        
+        if (showNotification) {
+          this.$toast.success('New version saved successfully');
+        }
+        console.log('Final save with history completed');
+      } catch (error) {
+        console.error('Error in final save:', error);
+        this.isSavingFinalVersion = false;
+        this.$toast.error('Error saving file: ' + error.message);
       }
     },
     addRow() {
@@ -180,10 +283,12 @@ export default {
       this.alphabeticalColumns.forEach((col) => {
         newRow[col.field] = "";
       });
+      if (!sheet.data) sheet.data = [];
       sheet.data.push(newRow);
       sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
+      this.handleUserChange();
     },
     addRowAbove() {
       if (!this.canEdit || this.selectedRows.length === 0) return;
@@ -205,7 +310,10 @@ export default {
       sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
+        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      }
+      this.handleUserChange();
     },
     addRowBelow() {
       if (!this.canEdit || this.selectedRows.length === 0) return;
@@ -227,7 +335,10 @@ export default {
       sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
+        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      }
+      this.handleUserChange();
     },
     handleRowSelection(index, selected) {
       const sheet = this.localFile.sheets[index];
@@ -248,14 +359,19 @@ export default {
       sheet.updatedAt = new Date().toISOString();
       this.localFile.updatedAt = new Date().toISOString();
       this.selectedRows = [];
-      this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      if (this.$refs[`sheetEditor${this.activeSheetTab}`]) {
+        this.$refs[`sheetEditor${this.activeSheetTab}`].setSelectedRows([]);
+      }
+      this.handleUserChange();
     },
     openDeleteSheetDialog(index) {
       this.sheetToDelete = index;
       this.dialogDeleteSheet = true;
     },
-    deleteSheetConfirm() {
+    async deleteSheetConfirm() {
       if (!this.canEdit) return;
+      try {
+        console.log('Deleting sheet at index:', this.sheetToDelete);
       this.localFile.sheets.splice(this.sheetToDelete, 1);
       if (this.activeSheetTab >= this.localFile.sheets.length && this.localFile.sheets.length > 0) {
         this.activeSheetTab = this.localFile.sheets.length - 1;
@@ -263,7 +379,25 @@ export default {
         this.activeSheetTab = 0;
       }
       this.localFile.updatedAt = new Date().toISOString();
+        this.hasUnsavedChanges = true;
+        this.hasRealChanges = true;
+        
+        console.log('Saving file after sheet deletion...');
+        const fileToUpdate = {
+          ...this.localFile,
+          lastSaved: new Date().toISOString()
+        };
+        const updatedFile = await this.updateFile(fileToUpdate);
+        this.localFile = updatedFile;
+        this.hasUnsavedChanges = false;
+        this.closeDeleteSheetDialog();
+        this.$toast.success('Sheet deleted successfully');
+        console.log('Sheet deletion completed and persisted');
+      } catch (error) {
+        console.error('Error deleting sheet:', error);
+        this.$toast.error('Error deleting sheet: ' + error.message);
       this.closeDeleteSheetDialog();
+      }
     },
     closeDeleteSheetDialog() {
       this.dialogDeleteSheet = false;
@@ -283,6 +417,7 @@ export default {
         this.localFile.sheets[index].name = this.newSheetName.trim();
         this.localFile.sheets[index].updatedAt = new Date().toISOString();
         this.localFile.updatedAt = new Date().toISOString();
+        this.handleUserChange();
       }
       this.editingSheetIndex = null;
       this.newSheetName = '';
@@ -291,11 +426,35 @@ export default {
       this.editingSheetIndex = null;
       this.newSheetName = '';
     },
-    async saveChanges() {
-      if (!this.canEdit) return;
-      const updatedFile = await this.updateFile({ ...this.localFile });
-      console.log('saveFile: Updated file', updatedFile);
+    openHistoryDialog() {
+      this.historyDialog = true;
     },
+    async handleHistoryReverted() {
+      await this.loadFileData();
+      this.historyDialog = false;
+      this.hasUnsavedChanges = false;
+      this.isNewSession = true;
+      this.sessionStartData = null;
+      this.hasRealChanges = false;
+      this.$toast.success('File reverted successfully');
+    },
+    async loadFileData() {
+      try {
+        const fileData = await this.getFileById(this.$route.params.id);
+        if (fileData) {
+          this.localFile = fileData;
+          this.isNewSession = true;
+          this.sessionStartData = null;
+          this.hasRealChanges = false;
+          this.isSavingFinalVersion = false;
+        } else {
+          this.localFile = null;
+        }
+      } catch (error) {
+        console.log('Error fetching file:', error.message);
+        this.localFile = null;
+      }
+    }
   },
   async mounted() {
     if (!this.$store.getters['auth/isAuthenticated']) {
@@ -304,16 +463,13 @@ export default {
       return;
     }
     this.loading = true;
-    try {
-      this.localFile = await this.getFileById(this.$route.params.id);
-      if (!this.localFile) {
-        this.localFile = null;
-      }
-    } catch (error) {
-      console.log('mounted: Error fetching file:', error.message);
-      this.localFile = null;
-    } finally {
+    await this.loadFileData();
       this.loading = false;
+  },
+  beforeDestroy() {
+    if (this.hasUnsavedChanges && this.hasRealChanges && !this.isSavingFinalVersion) {
+      console.log('Component destroying - performing final save');
+      this.performFinalSave(false);
     }
   },
 };
