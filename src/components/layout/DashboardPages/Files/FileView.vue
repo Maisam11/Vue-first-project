@@ -17,7 +17,6 @@
         <v-card-text>
           <v-row>
             <v-col cols="12" md="6">
-              <h3>File Metadata</h3>
               <ul style="list-style: none; margin-left: -1.2rem;">
                 <li><strong>File ID:</strong> {{ localFile.id }}</li>                
                 <li><strong>Current Version:</strong> {{ localFile.currentVersion || 1 }}</li>
@@ -27,7 +26,6 @@
               </ul>
             </v-col>
             <v-col cols="12" md="6" v-if="localFile.sheets && localFile.sheets.length">
-              <h3>Selected Sheet Metadata</h3>
               <ul style="list-style: none; margin-left: -1.2rem">
                 <li><strong>Sheet Name:</strong> {{ localFile.sheets[activeSheetTab]?.name || 'N/A' }}</li>
                 <li><strong>Created At:</strong> {{ formatDate(localFile.sheets[activeSheetTab]?.createdAt) || 'N/A' }}</li>
@@ -225,14 +223,17 @@ export default {
         this.isSavingFinalVersion = true;
         
         console.log('Performing FINAL save with HISTORY...');
-        const currentSheet = this.localFile.sheets[this.activeSheetTab];
-        if (currentSheet && currentSheet.data && this.hasRealChanges) {
-          console.log('Creating history version...');
           const newVersion = (this.localFile.currentVersion || 0) + 1;
           await this.createFileHistory({
             fileId: this.localFile.id,
-            sheetName: currentSheet.name,
-            data: currentSheet.data,
+          data: {
+            sheets: JSON.parse(JSON.stringify(this.localFile.sheets)),
+            fileName: this.localFile.name,
+            fileMetadata: {
+              createdAt: this.localFile.createdAt,
+              addedBy: this.localFile.addedBy
+            }
+          },
             version: newVersion,
             changeType: 'updated',
             changedBy: this.currentUser?.username || 'Unknown'
@@ -246,16 +247,6 @@ export default {
           };
           const updatedFile = await this.updateFile(fileToUpdate);
           this.localFile = updatedFile;
-        } else {
-          console.log('No real changes detected, performing regular save');
-          const fileToUpdate = {
-            ...this.localFile,
-            updatedAt: new Date().toISOString(),
-            lastSaved: new Date().toISOString()
-          };
-          const updatedFile = await this.updateFile(fileToUpdate);
-          this.localFile = updatedFile;
-        }
         
         this.hasUnsavedChanges = false;
         this.isNewSession = true;

@@ -7,24 +7,13 @@
         <GenericButton icon="mdi-close" @click="dialog = false"></GenericButton>
       </v-card-title>
       <v-card-text>
-        <v-tabs v-model="activeSheetTab">
-          <v-tab v-for="sheet in sheets" :key="sheet.name">
-            {{ sheet.name }}
-          </v-tab>
-        </v-tabs>
-        <v-tabs-items v-model="activeSheetTab">
-          <v-tab-item v-for="sheet in sheets" :key="sheet.name">
-            <v-list v-if="getSheetHistories(sheet.name).length > 0">
-              <v-list-item 
-                v-for="history in getSheetHistories(sheet.name)" 
+        <v-list v-if="fileHistories.length > 0">
+          <v-list-group 
+            v-for="history in fileHistories" 
                 :key="history.id"
-                :class="{ 'active-history': history.id === currentHistoryId }"
+                :value="history.id === expandedVersion"
               >
-                <v-list-item-icon>
-                  <v-icon :color="getHistoryIconColor(history.changeType)">
-                    {{ getHistoryIcon(history.changeType) }}
-                  </v-icon>
-                </v-list-item-icon>
+            <template v-slot:activator>
                 <v-list-item-content>
                   <v-list-item-title>
                     Version {{ history.version }} - {{ formatDate(history.timestamp) }}
@@ -32,11 +21,10 @@
                   <v-list-item-subtitle>
                     Changed by: {{ history.changedBy }} | 
                     Type: {{ history.changeType }} |
-                    Rows: {{ getHistoryDataLength(history) }}
                   </v-list-item-subtitle>
                 </v-list-item-content>
                 <v-list-item-action>
-                  <GenericButton small color="primary" @click="previewHistory(history)" > Preview </GenericButton>
+                  <GenericButton small color="primary" @click="previewVersion(history)" > Preview </GenericButton>
                 </v-list-item-action>
                 <v-list-item-action>
                   <GenericButton small color="success" @click="handleRevert(history)"
@@ -44,24 +32,29 @@
                     :disabled="revertingHistoryId !== null" >
                     Revert </GenericButton>
                 </v-list-item-action>
-              </v-list-item>
-            </v-list>
-            <v-alert v-else type="info">
-              No history found for this sheet.
-            </v-alert>
-          </v-tab-item>
-        </v-tabs-items>
-        <v-divider class="my-4" v-if="previewHistoryData"></v-divider>
-        <div v-if="previewHistoryData">
-          <h3>Preview - Version {{ previewHistoryData.version }}</h3>
+              </template>
+            <div v-if="previewData" class="text-dark">
+            <v-tabs v-model="previewActiveSheet">
+      <v-tab v-for="sheet in getPreviewSheets(previewData)" :key="sheet.name">
+         {{ sheet.name }}
+          </v-tab>
+        </v-tabs>
+        <v-tabs-items v-model="previewActiveSheet">
+        <v-tab-item v-for="sheet in getPreviewSheets(previewData)" :key="sheet.name">
           <GenericExcelSheet
-            :value="getPreviewData(previewHistoryData)"
+            :value="sheet.data || []"
             :columns="previewColumns"
             editorRef="previewEditor"
             type="preview"
             :readonly="true"
           />
+        </v-tab-item>
+        </v-tabs-items>
+        <v-divider></v-divider>
         </div>
+            </v-list-group>
+            </v-list>
+            <v-alert v-else type="info"> No history found for this file. </v-alert>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -83,9 +76,9 @@ export default {
   },
   data() {
     return {
-      activeSheetTab: 0,
-      previewHistoryData: null,
-      currentHistoryId: null,
+      previewActiveSheet: 0,
+      previewData: null,
+      expandedVersion: null,
       revertingHistoryId: null,
       previewColumns: Array.from({ length: 7 }, (_, i) => ({
         field: String.fromCharCode(65 + i),
@@ -107,74 +100,48 @@ export default {
     fileName() {
       return this.file?.name || 'Unknown File';
     },
-    sheets() {
-      return this.file?.sheets || [];
+    currentVersion() {
+      return this.file?.currentVersion || 1;
     },
-    histories() {
-      return this.getFileHistories(this.file?.id) || [];
+    localFile() {
+      return this.file;
+    },
+    fileHistories() {
+      const histories = this.getFileHistories(this.file?.id) || [];
+      return histories
+        .sort((a, b) => b.version - a.version);
     },
     ...mapGetters("files", ["getFileHistories"]),
   },
   methods: {
     ...mapActions("files", ["fetchFileHistories", "revertToHistory"]),
-    getSheetHistories(sheetName) {
-      return this.histories
-        .filter(history => history.sheetName === sheetName)
-        .sort((a, b) => b.version - a.version);
-    },
-    getHistoryIcon(changeType) {
-      const icons = {
-        'created': 'mdi-plus',
-        'updated': 'mdi-pencil',
-        'reverted': 'mdi-history'
-      };
-      return icons[changeType] || 'mdi-file-document';
-    },
-    getHistoryIconColor(changeType) {
-      const colors = {
-        'created': 'success',
-        'updated': 'primary',
-        'reverted': 'warning'
-      };
-      return colors[changeType] || 'grey';
+    getPreviewSheets(history) {
+      if (history.data && history.data.sheets) {
+        return history.data.sheets;
+      }
+      return [];
     },
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     },
-    getHistoryDataLength(history) {
-      if (Array.isArray(history.data)) {
-        return history.data.length;
-      } else if (history.data && Array.isArray(history.data.data)) {
-        return history.data.data.length;
-      }
-      return 0;
-    },
-    getPreviewData(history) {
-      if (Array.isArray(history.data)) {
-        return history.data;
-      } else if (history.data && Array.isArray(history.data.data)) {
-        return history.data.data;
-      }
-      return [];
-    },
-    previewHistory(history) {
-      this.previewHistoryData = history;
+    previewVersion(history) {
+      this.previewData = history;
+      this.previewActiveSheet = 0;
     },
     async handleRevert(history) { 
       try {
         if (!history || !history.id) {
           throw new Error('Invalid history data');
         }
-        if (confirm(`Are you sure you want to revert to Version ${history.version}? This will replace the current sheet data with the data from this version.`)) {
+        if (confirm(`Are you sure you want to revert to Version ${history.version}? This will replace the current file data with the data from this version.`)) {
           this.revertingHistoryId = history.id;
           console.log('Starting revert for history:', history.id);
           await this.revertToHistory({
             fileId: this.file.id,
             historyId: history.id
           });
-          this.currentHistoryId = history.id;
           this.revertingHistoryId = null;
           this.$emit('reverted', history);
           this.$toast.success(`Successfully reverted to Version ${history.version}`);
@@ -191,13 +158,11 @@ export default {
       if (this.file?.id) {
         try {
           await this.fetchFileHistories(this.file.id);
-          const latestHistory = this.histories[0];
-          if (latestHistory) {
-            this.currentHistoryId = latestHistory.id;
-          }
+         this.expandedVersion = null;
+         this.previewData = null;
         } catch (error) {
           console.error('Error loading histories:', error);
-          this.$toast.error('Failed to load histories');
+          this.$toast.error('Failed to load histories: ' + error.message);
         }
       }
     }
@@ -206,8 +171,9 @@ export default {
     dialog(newVal) {
       if (newVal) {
         this.loadHistories();
-        this.previewHistoryData = null;
+        this.previewData = null;
         this.revertingHistoryId = null;
+        this.expandedVersion = null;
       }
     },
     file: {
@@ -221,10 +187,3 @@ export default {
   }
 };
 </script>
-
-<style scoped>
-.active-history {
-  background-color: #e3f2fd;
-  border-left: 4px solid #2196f3;
-}
-</style>

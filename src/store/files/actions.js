@@ -254,17 +254,22 @@ export default {
     throw error;
   }
 },
-  async createFileHistory({ commit, dispatch }, { fileId, sheetName, data, version, changeType, changedBy }) {
+  async createFileHistory({ commit, dispatch }, { fileId, data, version, changeType, changedBy }) {
     try {
       const historyId = `history_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sheetsChanged = data.sheets ? data.sheets.map(sheet => ({
+      name: sheet.name,
+      changeType: 'updated',
+      rowsChanged: sheet.data ? sheet.data.length : 0
+    })) : [];
       const historyData = {
         id: historyId,
         fileId,
-        sheetName,
         data: JSON.parse(JSON.stringify(data)), 
         version,
         timestamp: new Date().toISOString(),
         changedBy,
+        sheetsChanged,
         changeType
       };
       await dispatch('firebase/create', { 
@@ -317,36 +322,43 @@ export default {
         throw new Error('File not found');
       }
       console.log('Current file found:', currentFile);
-      let historicalData = [];
-      if (Array.isArray(history.data)) {
-        historicalData = history.data;
-      } else if (history.data && Array.isArray(history.data.data)) {
-        historicalData = history.data.data;
-      } else if (history.data && history.data.data) {
-        historicalData = history.data.data;
-      } else {
-        historicalData = history.data || [];
-      }
-      console.log('Historical data extracted:', historicalData);
-      const updatedSheetData = {
-        data: historicalData,
-        updatedAt: new Date().toISOString()
+    let historicalFileData = {};
+    if (history.data && history.data.sheets) {
+      historicalFileData = {
+        sheets: history.data.sheets,
+        name: currentFile.name,
+        createdAt: currentFile.createdAt,
+        addedBy: currentFile.addedBy,
+        sharedWith: currentFile.sharedWith || [],
+        editors: currentFile.editors || [],
+        viewers: currentFile.viewers || []
       };
-      if (history.data && history.data.createdAt) {
-        updatedSheetData.createdAt = history.data.createdAt;
-      }
-      console.log('Sheet data to update:', updatedSheetData);
-      console.log('Updating sheet in Firebase...');
+    } else {
+      throw new Error('Invalid history data structure');
+    }
+      console.log('Historical data extracted:', historicalFileData);
+    if (historicalFileData.sheets && historicalFileData.sheets.length > 0) {
+      for (const sheet of historicalFileData.sheets) {
+        const sheetData = {
+          createdAt: sheet.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          data: sheet.data || []
+        };
+      console.log('Updating sheet:', sheet.name, 'with data:', sheetData);
       await dispatch('setSheet', {
         fileId,
-        sheetName: history.sheetName,
-        data: updatedSheetData
+        sheetName: sheet.name,
+        data: sheetData
       });
+      }
+    }
       const newVersion = (currentFile.currentVersion || 0) + 1;
       const updatedFileData = {
         ...currentFile,
+        ...historicalFileData,
         updatedAt: new Date().toISOString(),
         currentVersion: newVersion,
+        sheetNames: historicalFileData.sheets ? historicalFileData.sheets.map(sheet => sheet.name) : [],
         lastSaved: new Date().toISOString()
       };
       console.log('Updating file metadata:', updatedFileData);
@@ -358,8 +370,7 @@ export default {
       console.log('Creating revert history entry...');
       await dispatch('createFileHistory', {
         fileId,
-        sheetName: history.sheetName,
-        data: historicalData,
+        data: historicalFileData,
         version: newVersion,
         changeType: 'reverted',
         changedBy: currentUser?.username || 'Unknown'
