@@ -16,24 +16,32 @@
             <template v-slot:activator>
                 <v-list-item-content>
                   <v-list-item-title>
+                    <span v-if="isCurrentVersion(history)" class="text-primary">
+                      <strong>Current Version {{ history.version }}</strong> - {{ formatDate(history.timestamp) }}
+                    </span>
+                    <span v-else>
                     Version {{ history.version }} - {{ formatDate(history.timestamp) }}
+                    </span>
                   </v-list-item-title>
                   <v-list-item-subtitle>
-                    Changed by: {{ history.changedBy }} | 
-                    Type: {{ history.changeType }} |
+                    Changed by: {{ history.changedBy }}  
+                    <!-- Type: {{ history.changeType }} | -->
                   </v-list-item-subtitle>
                 </v-list-item-content>
-                <v-list-item-action>
+                <v-list-item-action v-if="!isCurrentVersion(history)">
                   <GenericButton small color="primary" @click="previewVersion(history)" > Preview </GenericButton>
                 </v-list-item-action>
-                <v-list-item-action>
+                <v-list-item-action v-if="!isCurrentVersion(history)">
                   <GenericButton small color="success" @click="handleRevert(history)"
                     :loading="revertingHistoryId === history.id"
                     :disabled="revertingHistoryId !== null" >
                     Revert </GenericButton>
+            </v-list-item-action>
+              <v-list-item-action v-else>
+                <h4 class="text-primary"> Current Version</h4>
                 </v-list-item-action>
               </template>
-            <div v-if="previewData" class="text-dark">
+            <div v-if="previewData && previewData.id === history.id" class="text-dark">
             <v-tabs v-model="previewActiveSheet">
       <v-tab v-for="sheet in getPreviewSheets(previewData)" :key="sheet.name">
          {{ sheet.name }}
@@ -115,6 +123,9 @@ export default {
   },
   methods: {
     ...mapActions("files", ["fetchFileHistories", "revertToHistory"]),
+    isCurrentVersion(history) {
+      return history.version === this.currentVersion;
+    },
     getPreviewSheets(history) {
       if (history.data && history.data.sheets) {
         return history.data.sheets;
