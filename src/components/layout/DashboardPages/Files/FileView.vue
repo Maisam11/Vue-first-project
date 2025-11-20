@@ -242,6 +242,7 @@ export default {
           const fileToUpdate = {
             ...this.localFile,
             currentVersion: newVersion,
+            activeHistoryVersion: null,
             updatedAt: new Date().toISOString(),
             lastSaved: new Date().toISOString()
           };

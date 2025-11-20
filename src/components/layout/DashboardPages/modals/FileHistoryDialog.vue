@@ -124,6 +124,9 @@ export default {
   methods: {
     ...mapActions("files", ["fetchFileHistories", "revertToHistory"]),
     isCurrentVersion(history) {
+  if (this.file?.activeHistoryVersion) {
+    return history.version === this.file.activeHistoryVersion;
+  }
       return history.version === this.currentVersion;
     },
     getPreviewSheets(history) {
@@ -148,7 +151,7 @@ export default {
         }
         if (confirm(`Are you sure you want to revert to Version ${history.version}? This will replace the current file data with the data from this version.`)) {
           this.revertingHistoryId = history.id;
-          console.log('Starting revert for history:', history.id);
+          console.log('Starting DIRECT revert to version:', history.version);
           await this.revertToHistory({
             fileId: this.file.id,
             historyId: history.id

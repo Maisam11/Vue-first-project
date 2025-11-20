@@ -296,9 +296,8 @@ export default {
       return [];
     }
   },
-  async revertToHistory({ dispatch, rootGetters, commit }, { fileId, historyId }) {
+  async revertToHistory({ dispatch, commit }, { fileId, historyId }) {
     try {
-      const currentUser = rootGetters['auth/currentUser'];
       console.log('=== STARTING REVERT PROCESS ===');
       console.log('File ID:', fileId);
       console.log('History ID:', historyId);
@@ -352,12 +351,11 @@ export default {
       });
       }
     }
-      const newVersion = (currentFile.currentVersion || 0) + 1;
       const updatedFileData = {
         ...currentFile,
         ...historicalFileData,
         updatedAt: new Date().toISOString(),
-        currentVersion: newVersion,
+        activeHistoryVersion: history.version,
         sheetNames: historicalFileData.sheets ? historicalFileData.sheets.map(sheet => sheet.name) : [],
         lastSaved: new Date().toISOString()
       };
@@ -367,21 +365,13 @@ export default {
         id: fileId, 
         data: updatedFileData 
       }, { root: true });
-      console.log('Creating revert history entry...');
-      await dispatch('createFileHistory', {
-        fileId,
-        data: historicalFileData,
-        version: newVersion,
-        changeType: 'reverted',
-        changedBy: currentUser?.username || 'Unknown'
-      });
       console.log('Refreshing file data...');
       const refreshedFile = await dispatch('getFileById', fileId);
       if (refreshedFile) {
         commit('UPDATE_FILE', refreshedFile);
         console.log('File updated in local state');
       }
-      console.log('=== REVERT COMPLETED SUCCESSFULLY ===');
+      console.log('=== REVERT COMPLETED - ACTIVE VERSION:', history.version, 'LATEST VERSION:', currentFile.currentVersion, '===');
       return history;
     } catch (error) {
       console.error('revertToHistory: Error:', error);
