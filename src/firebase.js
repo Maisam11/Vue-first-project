@@ -18,6 +18,7 @@ const firebaseConnector = getFirestore(app);
 const auth = getAuth(app);
 const adminApp = initializeApp(firebaseConfig, 'AdminApp');
 const adminAuth = getAuth(adminApp);
+const DEFAULT_ACCOUNT_ID = "12345";
 console.log('[Firebase] Initialized with config:', firebaseConfig);
 
-export { firebaseConnector, app, auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, adminAuth };
+export { firebaseConnector, app, auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, adminAuth, DEFAULT_ACCOUNT_ID };

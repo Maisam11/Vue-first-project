@@ -1,8 +1,9 @@
 import { collection, query, where, getDocs } from 'firebase/firestore';
-const collectionPath = '78910-files';
+import { DEFAULT_ACCOUNT_ID } from '@/firebase.js';
+const collectionPath = 'files';
 const subCollectionPath = 'sheets';
 const historyCollectionPath = 'file_histories';
-
+const getFullCollectionPath = (basePath) => `accounts/${DEFAULT_ACCOUNT_ID}/${basePath}`;
 export default {
   async fetchFiles({ commit, dispatch, rootGetters }) {
     try {
@@ -13,11 +14,11 @@ export default {
       let filesResponse = [];
       if (currentRole === 'admin') {
         console.log('fetchFiles: Admin user, fetching all files');
-        filesResponse = await dispatch('firebase/getAll', { collectionPath }, { root: true });
+        filesResponse = await dispatch('firebase/getAll', { collectionPath: getFullCollectionPath(collectionPath) }, { root: true });
       } else if (currentRole === 'staff') {
         console.log('fetchFiles: Staff user, fetching accessible files');
         const db = rootGetters['firebase/firebaseConnector'];
-        const colRef = collection(db, collectionPath);
+        const colRef = collection(db, getFullCollectionPath(collectionPath));
 
         const q1 = query(colRef, where('addedBy', '==', currentUser.username));
         const snap1 = await getDocs(q1);
@@ -89,7 +90,7 @@ export default {
         lastSaved: new Date().toISOString()
       };
       console.log('addFile: Creating file with data:', fileData);
-      await dispatch('firebase/create', { collectionPath, id: file.id, data: fileData }, { root: true });
+      await dispatch('firebase/create', { collectionPath: getFullCollectionPath(collectionPath), id: file.id, data: fileData }, { root: true });
       if (file.sheets && file.sheets.length > 0) {
         for (const sheet of file.sheets) {
           const sheetData = {
@@ -135,7 +136,7 @@ export default {
       console.log('updateFile: Updating file with data:', fileData);
       console.log('updateFile: Current user:', currentUser);
       console.log('updateFile: User in editors array?', fileData.editors.includes(currentUser?.uid));  
-      await dispatch('firebase/update', { collectionPath: '78910-files', id: file.id, data: fileData }, { root: true });
+      await dispatch('firebase/update', { collectionPath: getFullCollectionPath(collectionPath), id: file.id, data: fileData }, { root: true });
 
       if (file.sheets && file.sheets.length > 0) {
       const currentSheets = await dispatch('getSheets', { fileId: file.id });
@@ -179,7 +180,7 @@ export default {
       for (const sheetName of existingSheetNames) {
         await dispatch('deleteSheet', { fileId, sheetName });
       }
-      await dispatch('firebase/delete', { collectionPath, id: fileId }, { root: true });
+      await dispatch('firebase/delete', {  collectionPath: getFullCollectionPath(collectionPath), id: fileId }, { root: true });
       commit('DELETE_FILE', fileId);
       return fileId;
     } catch (error) {
@@ -193,7 +194,7 @@ export default {
       const currentUser = rootGetters['auth/currentUser'];
       console.log('getFileById: Fetching file', id, 'for user', currentUser);
 
-      const fileDataResponse = await dispatch('firebase/getById', { collectionPath, id }, { root: true });
+      const fileDataResponse = await dispatch('firebase/getById', {  collectionPath: getFullCollectionPath(collectionPath), id }, { root: true });
       if (!fileDataResponse) {
         console.log('getFileById: File not found');
         return null;
@@ -221,7 +222,7 @@ export default {
   },
   async getSheets({ dispatch }, { fileId }) {
     try {
-      const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
+      const sheetsPath = `${getFullCollectionPath(collectionPath)}/${fileId}/${subCollectionPath}`;
       const sheetsResponse = await dispatch('firebase/getAll', { collectionPath: sheetsPath }, { root: true });
       return sheetsResponse;
     } catch (error) {
@@ -231,7 +232,7 @@ export default {
   },
   async setSheet({ dispatch }, { fileId, sheetName, data }) {
     try {
-      const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
+      const sheetsPath = `${getFullCollectionPath(collectionPath)}/${fileId}/${subCollectionPath}`;
       await dispatch('firebase/create', { collectionPath: sheetsPath, id: sheetName, data }, { root: true });
       return { name: sheetName, ...data };
     } catch (error) {
@@ -241,7 +242,7 @@ export default {
   },
   async deleteSheet({ dispatch }, { fileId, sheetName }) {
     try {
-      const sheetsPath = `${collectionPath}/${fileId}/${subCollectionPath}`;
+      const sheetsPath = `${getFullCollectionPath(collectionPath)}/${fileId}/${subCollectionPath}`;
       await dispatch('firebase/delete', { collectionPath: sheetsPath, id: sheetName }, { root: true });
     console.log('Sheet deleted successfully:', sheetName);
     return sheetName;
@@ -273,7 +274,7 @@ export default {
         changeType
       };
       await dispatch('firebase/create', { 
-        collectionPath: historyCollectionPath, 
+        collectionPath: getFullCollectionPath(historyCollectionPath), 
         id: historyId, 
         data: historyData 
       }, { root: true });
@@ -287,7 +288,7 @@ export default {
   },
   async fetchFileHistories({ commit, dispatch }, fileId) {
     try {
-      const histories = await dispatch('firebase/getAll', { collectionPath: historyCollectionPath }, { root: true });
+      const histories = await dispatch('firebase/getAll', { collectionPath: getFullCollectionPath(historyCollectionPath) }, { root: true });
       const fileHistories = histories.filter(history => history.fileId === fileId);
       commit('SET_FILE_HISTORIES', fileHistories);
       return fileHistories;
@@ -305,7 +306,7 @@ export default {
         throw new Error('File ID and History ID are required');
       }
       const history = await dispatch('firebase/getById', { 
-        collectionPath: historyCollectionPath, 
+        collectionPath: getFullCollectionPath(historyCollectionPath), 
         id: historyId 
       }, { root: true });
       if (!history) {
@@ -313,7 +314,7 @@ export default {
       }
       console.log('History record found:', history);
       const currentFile = await dispatch('firebase/getById', { 
-        collectionPath, 
+        collectionPath: getFullCollectionPath(collectionPath), 
         id: fileId 
       }, { root: true });
 
@@ -361,7 +362,7 @@ export default {
       };
       console.log('Updating file metadata:', updatedFileData);
       await dispatch('firebase/update', { 
-        collectionPath, 
+        collectionPath: getFullCollectionPath(collectionPath), 
         id: fileId, 
         data: updatedFileData 
       }, { root: true });

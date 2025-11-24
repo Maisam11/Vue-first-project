@@ -1,5 +1,7 @@
 import { getAuth, createUserWithEmailAndPassword, } from 'firebase/auth';
 import { adminAuth } from '@/firebase.js';
+import { DEFAULT_ACCOUNT_ID } from '@/firebase.js';
+const getFullCollectionPath = (basePath) => `accounts/${DEFAULT_ACCOUNT_ID}/${basePath}`;
 getAuth();
 export default {
   async createUser({ dispatch }, { username, password, role }) {
@@ -27,7 +29,7 @@ export default {
         console.log('fetchAllUsers: Non-admin/staff user attempted to fetch all users');
         return [];
       }
-      const users = await dispatch('firebase/getAll', { collectionPath: 'users' }, { root: true });
+      const users = await dispatch('firebase/getAll', { collectionPath: getFullCollectionPath('users') }, { root: true });
       if (currentRole === 'staff') {
         const filteredUsers = users.filter(user => 
           user.role === 'staff' && user.id !== currentUser?.uid
@@ -54,7 +56,7 @@ export default {
         createdAt: new Date().toISOString()
       };
       await dispatch('firebase/create', {
-        collectionPath: 'users',
+        collectionPath: getFullCollectionPath('users'),
         id: userId,
         data: userDoc 
       }, { root: true });
@@ -68,7 +70,7 @@ export default {
   async updateUserRole({ dispatch }, { userId, role }) {
     try {
       await dispatch('firebase/update', { 
-        collectionPath: 'users', 
+        collectionPath: getFullCollectionPath('users'), 
         id: userId, 
         data: { role, updatedAt: new Date().toISOString() } 
       }, { root: true });
@@ -84,7 +86,7 @@ export default {
   async deleteUser({ dispatch}, userId) {
     try {
       await dispatch('firebase/delete', { 
-        collectionPath: 'users', 
+        collectionPath: getFullCollectionPath('users'), 
         id: userId 
       }, { root: true });
       console.log('deleteUser: Deleted Firestore user doc', userId);
@@ -102,23 +104,25 @@ export default {
         console.log('fetchUserRole: Skipping - currentUser or uid undefined');
         return null;
       }
+      console.log('fetchUserRole: Fetching role for user:', currentUser.uid, 'username:', currentUser.username);
       const userDoc = await dispatch('firebase/getById', { 
-        collectionPath: 'users', 
+        collectionPath: getFullCollectionPath('users'), 
         id: currentUser.uid 
       }, { root: true });
       if (userDoc) {
-        console.log('fetchUserRole: User document from Firestore:', userDoc);
+        console.log('fetchUserRole: User document found:', userDoc);
         commit('SET_CURRENT_USER_ROLE', userDoc.role);
         console.log('fetchUserRole: Role set to', userDoc.role);
         return userDoc.role;
       } else {
-        console.log('fetchUserRole: No user doc found');
+        console.log('fetchUserRole: No user doc found - creating new one');
  
         await dispatch('setUserRole', { 
           userId: currentUser.uid, 
           role: 'staff', 
           username: currentUser.username 
         });
+        commit('SET_CURRENT_USER_ROLE', 'staff');
         return 'staff';
       }
     } catch (error) {
