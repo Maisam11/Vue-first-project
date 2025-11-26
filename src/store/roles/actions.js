@@ -1,7 +1,6 @@
 import { getAuth, createUserWithEmailAndPassword, } from 'firebase/auth';
 import { adminAuth } from '@/firebase.js';
-import { DEFAULT_ACCOUNT_ID } from '@/firebase.js';
-const getFullCollectionPath = (basePath) => `accounts/${DEFAULT_ACCOUNT_ID}/${basePath}`;
+import { MODULE_NAMES } from '../moduleConfig.js';
 getAuth();
 export default {
   async createUser({ dispatch }, { username, password, role }) {
@@ -29,7 +28,7 @@ export default {
         console.log('fetchAllUsers: Non-admin/staff user attempted to fetch all users');
         return [];
       }
-      const users = await dispatch('firebase/getAll', { collectionPath: getFullCollectionPath('users') }, { root: true });
+      const users = await dispatch('firebase/getAll', { collectionPath: MODULE_NAMES.USERS }, { root: true });
       if (currentRole === 'staff') {
         const filteredUsers = users.filter(user => 
           user.role === 'staff' && user.id !== currentUser?.uid
@@ -56,7 +55,7 @@ export default {
         createdAt: new Date().toISOString()
       };
       await dispatch('firebase/create', {
-        collectionPath: getFullCollectionPath('users'),
+        collectionPath: MODULE_NAMES.USERS,
         id: userId,
         data: userDoc 
       }, { root: true });
@@ -70,7 +69,7 @@ export default {
   async updateUserRole({ dispatch }, { userId, role }) {
     try {
       await dispatch('firebase/update', { 
-        collectionPath: getFullCollectionPath('users'), 
+        collectionPath: MODULE_NAMES.USERS,
         id: userId, 
         data: { role, updatedAt: new Date().toISOString() } 
       }, { root: true });
@@ -86,7 +85,7 @@ export default {
   async deleteUser({ dispatch}, userId) {
     try {
       await dispatch('firebase/delete', { 
-        collectionPath: getFullCollectionPath('users'), 
+        collectionPath: MODULE_NAMES.USERS, 
         id: userId 
       }, { root: true });
       console.log('deleteUser: Deleted Firestore user doc', userId);
@@ -106,7 +105,7 @@ export default {
       }
       console.log('fetchUserRole: Fetching role for user:', currentUser.uid, 'username:', currentUser.username);
       const userDoc = await dispatch('firebase/getById', { 
-        collectionPath: getFullCollectionPath('users'), 
+        collectionPath: MODULE_NAMES.USERS,
         id: currentUser.uid 
       }, { root: true });
       if (userDoc) {
