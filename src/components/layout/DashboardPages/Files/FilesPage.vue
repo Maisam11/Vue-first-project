@@ -37,6 +37,8 @@
             <GenericButton color="primary" @click="applyDateFilter" style="margin-right: 0.3rem;"> Filter </GenericButton>
             <GenericButton color="secondary" @click="clearDateFilter" v-if="startDate || endDate" style="margin-right: 0.3rem;">
               Reset </GenericButton>
+            <v-select v-if="isAdmin" v-model="selectedUser" :items="userOptions" placeholder="Select User" dense outlined clearable
+              style="max-width: 200px; height: 35px; margin-right: 0.3rem;" @change="applyUserFilter" ></v-select>
           </div>
           <div class="d-flex">
             <GenericButton color="primary" icon="mdi-plus" background @click="openDialog(null)" id="add-new-file-btn" v-if="canCreateFiles"> 
@@ -140,6 +142,7 @@ export default {
       endDateMenu: false,
       startDate: null,
       endDate: null,
+      selectedUser: null,
       snackbar: { show: false, message: '', color: 'success' },
       pagination: {
         currentPage: 1, itemsPerPage: 10, totalPages: 1, startIndex: 0, endIndex: 0
@@ -162,7 +165,7 @@ export default {
   },
   computed: {
     ...mapGetters("files", ["getFiles", "getFilteredFiles"]),
-    ...mapGetters("roles", ["canUserPerformAction", "getCurrentUserRole"]),
+    ...mapGetters("roles", ["canUserPerformAction", "getCurrentUserRole", "getAllUsers"]),
     ...mapGetters("auth", ["currentUser"]), 
     paginatedFiles() {
       const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
@@ -171,6 +174,17 @@ export default {
     },
     isAdmin() {
       return this.getCurrentUserRole === 'admin';
+    },
+
+    userOptions() {
+      const users = this.getAllUsers || [];
+      return [
+        { text: 'All Users', value: null },
+        ...users.map(user => ({
+          text: user.username || user.email || 'Unknown User',
+          value: user.username || user.id
+        }))
+      ];
     },
     canCreateFiles() {
       return this.canUserPerformAction('files', 'create') || this.isAdmin;
@@ -229,6 +243,7 @@ export default {
   },
   methods: {
     ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFiles"]),
+    ...mapActions("roles", ["fetchAllUsers"]),
     showNotification(message, type = 'success') {
       this.snackbar.message = message;
       this.snackbar.color = type;
@@ -239,33 +254,49 @@ export default {
       const date = new Date(dateString);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     },
-    applyDateFilter() {
-      let filteredFiles = this.getFiles;
-      if (this.startDate || this.endDate) {
-        filteredFiles = this.getFiles.filter(file => {
-          const fileDate = new Date(file.createdAt);
-          let isInRange = true;
-          if (this.startDate) {
-            const start = new Date(this.startDate);
-            start.setHours(0, 0, 0, 0);
-            isInRange = isInRange && fileDate >= start;
-          }
-          if (this.endDate) {
-            const end = new Date(this.endDate);
-            end.setHours(23, 59, 59, 999);
-            isInRange = isInRange && fileDate <= end;
-          }
-          return isInRange;
+    async applyDateFilter() {
+      try {
+        await this.fetchFiles({ 
+          startDate: this.startDate, 
+          endDate: this.endDate 
         });
+        this.resetPagination();
+        this.showNotification('Date filter applied successfully');
+      } catch (error) {
+        console.error('applyDateFilter: Error:', error);
+        this.showNotification('Error applying date filter: ' + error.message, 'error');
       }
-      this.$store.commit('files/SET_FILTERED_FILES', filteredFiles);
-      this.resetPagination();
     },
-    clearDateFilter() {
+    async clearDateFilter() {
       this.startDate = null;
       this.endDate = null;
-      this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
+      try {
+        await this.fetchFiles();
+        this.resetPagination();
+        this.showNotification('Date filter cleared');
+      } catch (error) {
+        console.error('clearDateFilter: Error:', error);
+        this.showNotification('Error clearing date filter: ' + error.message, 'error');
+      }
+    },
+
+    async applyUserFilter() {
+      try {
+        await this.fetchFiles({ 
+          startDate: this.startDate, 
+          endDate: this.endDate,
+          selectedUser: this.selectedUser
+        });
       this.resetPagination();
+        if (this.selectedUser) {
+          this.showNotification(`Showing files for selected user`);
+        } else {
+          this.showNotification('Showing all users files');
+        }
+      } catch (error) {
+        console.error('applyUserFilter: Error:', error);
+        this.showNotification('Error applying user filter: ' + error.message, 'error');
+      }
     },
     resetPagination() {
       this.pagination.currentPage = 1;
@@ -397,11 +428,14 @@ export default {
     if (currentUser && currentUser.uid) {
       await this.$store.dispatch('roles/fetchUserRole', currentUser.uid);
     }
+
+    if (this.isAdmin) {
+      await this.fetchAllUsers();
+    }
     
     this.loading = true;
     try {
       await this.fetchFiles();
-      this.$store.commit('files/SET_FILTERED_FILES', this.getFiles);
       this.resetPagination();
     } catch (error) {
       console.error('mounted: Error fetching files:', error.message);

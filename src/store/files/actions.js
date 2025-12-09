@@ -4,45 +4,89 @@ const collectionPath = MODULE_NAMES.FILES;
 const subCollectionPath = MODULE_NAMES.SHEETS;
 const historyCollectionPath = MODULE_NAMES.FILE_HISTORIES;
 export default {
-  async fetchFiles({ commit, dispatch, rootGetters }) {
+  async fetchFiles({ commit, dispatch, rootGetters }, { startDate = null, endDate = null, selectedUser = null } = {}) {
     try {
       const currentRole = rootGetters['roles/getCurrentUserRole'];
       const currentUser = rootGetters['auth/currentUser'];
       console.log('fetchFiles: Current user:', currentUser);
       console.log('fetchFiles: Current role:', currentRole);
+    console.log('fetchFiles: Date filter - Start:', startDate, 'End:', endDate);
+    console.log('fetchFiles: User filter:', selectedUser);
       let filesResponse = [];
       if (currentRole === 'admin') {
         console.log('fetchFiles: Admin user, fetching all files');
         filesResponse = await dispatch('firebase/getAll', { collectionPath }, { root: true });
+      if (selectedUser) {
+        const allUsers = rootGetters['roles/getAllUsers'] || [];
+        const targetUser = allUsers.find(user => user.username === selectedUser);
+        if (targetUser) {
+          filesResponse = filesResponse.filter(file => {
+            const isCreatedByUser = file.addedBy === selectedUser;
+            const isSharedWithUser = 
+              (file.sharedWith || []).includes(targetUser.id) ||
+              (file.editors || []).includes(targetUser.id) ||
+              (file.viewers || []).includes(targetUser.id);
+            return isCreatedByUser || isSharedWithUser;
+          });
+          console.log(`fetchFiles: Filtered files for user ${selectedUser}:`, filesResponse.length);
+        }
+      }
+
+      if (startDate || endDate) {
+        filesResponse = filesResponse.filter(file => {
+          const fileDate = new Date(file.createdAt);
+          let isInRange = true;
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            isInRange = isInRange && fileDate >= start;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            isInRange = isInRange && fileDate <= end;
+          }
+          return isInRange;
+        });
+      }
       } else if (currentRole === 'staff') {
         console.log('fetchFiles: Staff user, fetching accessible files');
         const db = rootGetters['firebase/firebaseConnector'];
-        const colRef = collection(db, collectionPath);
-
-        const q1 = query(colRef, where('addedBy', '==', currentUser.username));
-        const snap1 = await getDocs(q1);
-        const ownFiles = snap1.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('fetchFiles: Own files:', ownFiles.length);
-
-        const q2 = query(colRef, where('sharedWith', 'array-contains', currentUser.uid));
-        const snap2 = await getDocs(q2);
-        const sharedFiles = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('fetchFiles: Shared files (old):', sharedFiles.length);
-
-        const q3 = query(colRef, where('editors', 'array-contains', currentUser.uid));
-        const snap3 = await getDocs(q3);
-        const editedFiles = snap3.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('fetchFiles: Edited files:', editedFiles.length);
-
-        const q4 = query(colRef, where('viewers', 'array-contains', currentUser.uid));
-        const snap4 = await getDocs(q4);
-        const viewedFiles = snap4.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log('fetchFiles: Viewed files:', viewedFiles.length);
-        filesResponse = [...ownFiles, ...sharedFiles, ...editedFiles, ...viewedFiles];
+        const queries = [];
+       let ownFilesQuery = query(collection(db, collectionPath),
+       where('addedBy', '==', currentUser.username));
+      const sharedWithQuery = query(collection(db, collectionPath), where('sharedWith', 'array-contains', currentUser.uid));
+      const editorsQuery = query(collection(db, collectionPath), where('editors', 'array-contains', currentUser.uid));
+        const viewersQuery = query(collection(db, collectionPath), where('viewers', 'array-contains', currentUser.uid));
+      queries.push(ownFilesQuery, sharedWithQuery, editorsQuery, viewersQuery);
+        const queryResults = await Promise.all(queries.map(q => getDocs(q)));
+        filesResponse = queryResults.flatMap(snapshot => 
+        snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
         filesResponse = filesResponse.filter((file, index, self) => 
           index === self.findIndex((f) => f.id === file.id)
         );
+
+      if (startDate || endDate || selectedUser) {
+        filesResponse = filesResponse.filter(file => {
+          const fileDate = new Date(file.createdAt);
+          let isInRange = true;
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            isInRange = isInRange && fileDate >= start;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            isInRange = isInRange && fileDate <= end;
+          }
+          if (selectedUser) {
+            isInRange = isInRange && file.addedBy === selectedUser;
+          }
+          return isInRange;
+        });
+      }
         console.log('fetchFiles staff: Total accessible files:', filesResponse.length);
       } else {
         console.log('fetchFiles: No access for role:', currentRole);
