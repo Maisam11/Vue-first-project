@@ -31,7 +31,8 @@ export default {
       const users = await dispatch('firebase/getAll', { collectionPath: MODULE_NAMES.USERS }, { root: true });
       if (currentRole === 'staff') {
         const filteredUsers = users.filter(user => 
-          user.role === 'staff' && user.id !== currentUser?.uid
+          { if (user.id === currentUser?.uid) return false;
+          return user.role === 'admin' || user.role === 'staff';}
         );
         console.log('fetchAllUsers: Filtered staff users for sharing:', filteredUsers);
         commit('SET_ALL_USERS', filteredUsers);

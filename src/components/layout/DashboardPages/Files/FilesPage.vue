@@ -37,7 +37,7 @@
             <GenericButton color="primary" @click="applyDateFilter" style="margin-right: 0.3rem;"> Filter </GenericButton>
             <GenericButton color="secondary" @click="clearDateFilter" v-if="startDate || endDate" style="margin-right: 0.3rem;">
               Reset </GenericButton>
-            <v-select v-if="isAdmin" v-model="selectedUser" :items="userOptions" placeholder="Select User" dense outlined clearable
+            <v-select v-if="isAdmin || isStaff" v-model="selectedUser" :items="userOptions" placeholder="Select User" dense outlined clearable
               style="max-width: 200px; height: 35px; margin-right: 0.3rem;" @change="applyUserFilter" ></v-select>
           </div>
           <div class="d-flex">
@@ -80,7 +80,7 @@
           :onView="viewFile" 
           :onDelete="canDeleteFile(item) ? openDeleteDialog : null" />
         </div>
-         <!-- share menu -->
+        
          <div>
           <v-btn v-if="isAdmin || isCreator(item)" icon small class="ml-1" @click="openDialog(item)" title="Share File" >
             <v-icon small color="info">mdi-share</v-icon>
@@ -176,15 +176,52 @@ export default {
       return this.getCurrentUserRole === 'admin';
     },
 
+    isStaff() {
+      return this.getCurrentUserRole === 'staff';
+    },
     userOptions() {
       const users = this.getAllUsers || [];
+      if (this.isStaff) {
+        const accessibleUsers = new Set();
+        if (this.currentUser?.username) {
+          accessibleUsers.add(this.currentUser.username);
+        }
+        this.getFiles.forEach(file => {
+          if (file.addedBy) {
+            accessibleUsers.add(file.addedBy);
+          }
+        });
+        const filteredUsers = users.filter(user => 
+          accessibleUsers.has(user.username)
+        );
+        return [
+          { text: 'All Users', value: null },
+          ...filteredUsers.map(user => ({
+            text: user.username || user.email || 'Unknown User',
+            value: user.username || user.id
+          }))
+        ];
+      }
+
+      if (this.isAdmin) {
+        const sharedWithAdminUsers = new Set();
+        this.getFiles.forEach(file => {
+          if (file.addedBy) {
+            sharedWithAdminUsers.add(file.addedBy);
+          }
+        });
+        const filteredUsers = users.filter(user => 
+          sharedWithAdminUsers.has(user.username)
+        );
       return [
         { text: 'All Users', value: null },
-        ...users.map(user => ({
+        ...filteredUsers.map(user => ({
           text: user.username || user.email || 'Unknown User',
           value: user.username || user.id
         }))
       ];
+      }
+      return [];
     },
     canCreateFiles() {
       return this.canUserPerformAction('files', 'create') || this.isAdmin;
@@ -429,7 +466,7 @@ export default {
       await this.$store.dispatch('roles/fetchUserRole', currentUser.uid);
     }
 
-    if (this.isAdmin) {
+    if (this.isAdmin || this.isStaff) {
       await this.fetchAllUsers();
     }
     

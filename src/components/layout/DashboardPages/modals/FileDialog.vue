@@ -15,10 +15,10 @@
         <v-select
           v-if="canShare"
           v-model="selectedUsers"
-          :items="availableStaffUsers"
-          item-text="username"
+          :items="availableUsers"
+          item-text="displayName"
           item-value="id"
-          label="Share With Staff"
+          label="Share With Users"
           multiple
           dense
           persistent-hint
@@ -32,7 +32,7 @@
               
               <v-list-item-content class="py-1">
                 <v-list-item-title class="text-body-2 font-weight-medium">
-                  {{ user.username }}
+                  {{ user.displayName }}
                 </v-list-item-title>
               </v-list-item-content>
 
@@ -74,7 +74,7 @@ export default {
     editedItem: Object,
   },
   computed: {
-    ...mapGetters("roles", ["getCurrentUserRole"]),
+    ...mapGetters("roles", ["getCurrentUserRole", "getAllUsers"]),
     ...mapGetters("auth", ["currentUser"]),
     isAdmin() {
       return this.getCurrentUserRole === 'admin';
@@ -85,15 +85,26 @@ export default {
     canShare() {
       return this.isAdmin || this.isCreator;
     },
-    availableStaffUsers() {
-      return this.staffUsers.filter(staff => 
-        !this.selectedUsers.includes(staff.id)
+    availableUsers() {
+      if (!this.allUsers || !this.currentUser) return [];
+      const filteredUsers = this.allUsers.filter(user => 
+        user.id !== this.currentUser?.uid &&
+        !this.selectedUsers.includes(user.id)
       );
+      return filteredUsers.map(user => ({
+        ...user,
+        displayName: `${user.username}${user.role === 'admin' ? ' (Admin)' : ''}`
+      }));
     },
     selectedUserDetails() {
-      return this.staffUsers.filter(user => 
+      if (!this.allUsers || !this.currentUser) return [];
+      return this.allUsers.filter(user => 
         this.selectedUsers.includes(user.id)
-      );
+      )
+        .map(user => ({
+          ...user,
+          displayName: user.username || user.email || 'Unknown User'
+        }));
     }
   },
   data() {
@@ -115,7 +126,7 @@ export default {
             editors: [this.$store.getters['auth/currentUser']?.uid].filter(Boolean),
             viewers: []
           },
-      staffUsers: [],
+      allUsers: [],
       selectedUsers: [],
       userAccess: {},
       accessLevels: [
@@ -136,10 +147,10 @@ export default {
         }
       });
     },
-    async loadStaffUsers() {
+    async loadUsers() {
       if (this.canShare) {
         const users = await this.fetchAllUsers();
-        this.staffUsers = users.filter(u => u.role === 'staff');
+        this.allUsers = users;
 
         if (this.editedItem && this.editedItem.id) {
           this.selectedUsers = [
@@ -210,7 +221,7 @@ export default {
     dialog(newVal) {
       if (newVal) {
         this.focusInput();
-        this.loadStaffUsers();
+        this.loadUsers();
       }
     },
     editedItem(newVal) {
@@ -237,7 +248,7 @@ export default {
         this.userAccess = {};
       } else {
         this.$nextTick(() => {
-          this.loadStaffUsers();
+          this.loadUsers();
         });
       }
     },

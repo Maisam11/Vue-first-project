@@ -13,21 +13,29 @@ export default {
     console.log('fetchFiles: Date filter - Start:', startDate, 'End:', endDate);
     console.log('fetchFiles: User filter:', selectedUser);
       let filesResponse = [];
+      const db = rootGetters['firebase/firebaseConnector'];
       if (currentRole === 'admin') {
         console.log('fetchFiles: Admin user, fetching all files');
-        filesResponse = await dispatch('firebase/getAll', { collectionPath }, { root: true });
+        const queries = [];
+        const sharedWithQuery = query(collection(db, collectionPath), 
+          where('sharedWith', 'array-contains', currentUser.uid));
+        const editorsQuery = query(collection(db, collectionPath), 
+          where('editors', 'array-contains', currentUser.uid));
+        const viewersQuery = query(collection(db, collectionPath), 
+          where('viewers', 'array-contains', currentUser.uid));
+        queries.push(sharedWithQuery, editorsQuery, viewersQuery);
+        const queryResults = await Promise.all(queries.map(q => getDocs(q)));
+        filesResponse = queryResults.flatMap(snapshot => 
+          snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        filesResponse = filesResponse.filter((file, index, self) => 
+          index === self.findIndex((f) => f.id === file.id)
+        );
+        console.log('fetchFiles admin: Total accessible files:', filesResponse.length);
       if (selectedUser) {
         const allUsers = rootGetters['roles/getAllUsers'] || [];
         const targetUser = allUsers.find(user => user.username === selectedUser);
         if (targetUser) {
-          filesResponse = filesResponse.filter(file => {
-            const isCreatedByUser = file.addedBy === selectedUser;
-            const isSharedWithUser = 
-              (file.sharedWith || []).includes(targetUser.id) ||
-              (file.editors || []).includes(targetUser.id) ||
-              (file.viewers || []).includes(targetUser.id);
-            return isCreatedByUser || isSharedWithUser;
-          });
+          filesResponse = filesResponse.filter(file => file.addedBy === selectedUser);
           console.log(`fetchFiles: Filtered files for user ${selectedUser}:`, filesResponse.length);
         }
       }
@@ -51,7 +59,6 @@ export default {
       }
       } else if (currentRole === 'staff') {
         console.log('fetchFiles: Staff user, fetching accessible files');
-        const db = rootGetters['firebase/firebaseConnector'];
         const queries = [];
        let ownFilesQuery = query(collection(db, collectionPath),
        where('addedBy', '==', currentUser.username));
