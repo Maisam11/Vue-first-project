@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { MODULE_NAMES } from '../moduleConfig.js';
 const collectionPath = MODULE_NAMES.FILES;
 const subCollectionPath = MODULE_NAMES.SHEETS;
@@ -100,6 +100,11 @@ export default {
         return [];
       }
       console.log('fetchFiles response:', filesResponse.length, 'files');
+      filesResponse.sort((a, b) => {
+        const orderA = a.order || 9999;
+        const orderB = b.order || 9999;
+        return orderA - orderB;
+      });
 
       const filesWithSheets = await Promise.all(filesResponse.map(async (file) => {
         try {
@@ -122,10 +127,35 @@ export default {
       throw error;
     }
   },
+  async updateFilesOrder({ dispatch, rootGetters }, filesWithNewOrder) {
+    try {
+      const db = rootGetters['firebase/firebaseConnector'];
+      const batch = writeBatch(db);
+      filesWithNewOrder.forEach((file, index) => {
+        const fileRef = doc(db, collectionPath, file.id);
+        batch.update(fileRef, { 
+          order: index + 1,
+          updatedAt: new Date().toISOString() 
+        });
+      });
+      await batch.commit();
+      filesWithNewOrder.forEach(file => {
+        dispatch('updateFileInState', file);
+      });
+      return filesWithNewOrder;
+    } catch (error) {
+      console.error('updateFilesOrder: Error:', error);
+      throw error;
+    }
+  },
+  updateFileInState({ commit }, file) {
+    commit('UPDATE_FILE', file);
+  },
   async addFile({ commit, dispatch, state, rootGetters }, file) {
     if (!file.id) throw new Error('File ID must be provided');
     if (state.files.some(f => f.id === file.id)) throw new Error('File with this ID already exists');
     const currentUser = rootGetters['auth/currentUser'];
+    const currentFilesCount = state.files.length;
     try {
       const fileData = {
         name: file.name,
@@ -137,6 +167,7 @@ export default {
         viewers: file.viewers || [],
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
         currentVersion: 1,
+        order: currentFilesCount + 1,
         lastSaved: new Date().toISOString()
       };
       console.log('addFile: Creating file with data:', fileData);
@@ -181,6 +212,7 @@ export default {
         viewers: file.viewers || [],
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
         currentVersion: file.currentVersion || 1,
+        order: file.order || 9999,
         lastSaved: new Date().toISOString()
       };
       console.log('updateFile: Updating file with data:', fileData);

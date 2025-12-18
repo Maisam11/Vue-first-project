@@ -3,7 +3,7 @@
     <v-data-table
       v-bind="$attrs"
       :headers="processedHeaders"
-      :items="items"
+      :items="localItems"
       :loading="loading"
       :search="search"
       :items-per-page="itemsPerPage"
@@ -32,18 +32,29 @@
         </v-toolbar>
       </template>
 
+      <template v-slot:body="{  }">
+        <draggable
+          :list="localItems"
+          tag="tbody"
+          handle=".drag-handle"
+          @end="onDragEnd"
+        >
+          <tr v-for="item in localItems" :key="item[itemKey]">
+            <td v-if="hasActionsColumn">
+              <v-icon class="drag-handle" style="cursor: grab;">mdi-drag</v-icon>
+            </td>
       <template
         v-for="header in processedHeaders"
-        v-slot:[`item.${header.value}`]="{ item }"
       >
+      <td v-if="header.value !== 'actions'" :key="header.value">
         <slot :name="`column-${header.value}`" :item="item">
           <template>
             {{ item[header.value] }}
           </template>
         </slot>
-      </template>
+      </td>
 
-      <template v-if="hasActionsColumn" v-slot:actions="{ item }">
+      <td v-else-if="header.value === 'actions'" :key="header.value">
         <slot name="column-actions" :item="item">
           <component
             v-if="isComponent(actionsComponent)"
@@ -54,6 +65,10 @@
             :onDelete="$attrs.onDelete"
           />
         </slot>
+      </td>
+      </template>
+          </tr>
+        </draggable>
       </template>
 
       <template
@@ -96,8 +111,12 @@
 </template>
 
 <script>
+import draggable from 'vuedraggable'
 export default {
   inheritAttrs: false,
+  components: {
+    draggable
+  },
   props: {
     title: { type: String, default: "Table" },
     headers: { type: Array, required: true },
@@ -123,6 +142,11 @@ export default {
     loadingText: String,
     itemKey: { type: String, default: "id" },
   },
+  data() {
+    return {
+      localItems: [...this.items]
+    }
+  },
   computed: {
     processedHeaders() {
       return this.headers.map((header) => ({
@@ -130,7 +154,7 @@ export default {
       }));
     },
     hasActionsColumn() {
-      return this.headers.some((h) => h.value === "actions");
+      return true;
     },
     actionsComponent() {
       if (this.$scopedSlots["column-actions"]) {
@@ -151,6 +175,17 @@ export default {
         (obj.componentOptions && obj.componentOptions.Ctor)
       );
     },
+    onDragEnd() {
+      this.$emit('order-changed', this.localItems);
+    }
   },
+  watch: {
+    items: {
+      handler(newItems) {
+        this.localItems = [...newItems];
+      },
+      deep: true
+    }
+  }
 };
 </script>

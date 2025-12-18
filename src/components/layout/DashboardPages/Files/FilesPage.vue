@@ -16,6 +16,7 @@
       :showExpand="true"
       :loading="loading"
       hide-default-footer
+      @order-changed="handleOrderChange"
     >
       <template v-slot:toolbar-actions>
         <div class="d-flex mb-4 align-center flex-wrap">
@@ -149,7 +150,6 @@ export default {
       },
       itemsPerPageOptions: [5, 10],
       headers: [
-        { text: "", value: "data-table-expand", width: "50px" },
         { text: "File Name", value: "name", width: "200px", class: "font-weight-bold", filterable: true },
         { text: "Created At", value: "createdAt", width: "200px", filterable: true, sortable: true },
         { text: "Updated At", value: "updatedAt", width: "200px", filterable: true, sortable: true },
@@ -170,7 +170,12 @@ export default {
     paginatedFiles() {
       const start = (this.pagination.currentPage - 1) * this.pagination.itemsPerPage;
       const end = start + this.pagination.itemsPerPage;
-      return this.getFilteredFiles.slice(start, end);
+      const sortedFiles = [...this.getFilteredFiles].sort((a, b) => {
+        const orderA = a.order || 0;
+        const orderB = b.order || 0;
+        return orderA - orderB;
+      });
+      return sortedFiles.slice(start, end);
     },
     isAdmin() {
       return this.getCurrentUserRole === 'admin';
@@ -279,7 +284,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFiles"]),
+    ...mapActions("files", ["addFile", "updateFile", "deleteFile", "fetchFiles", "updateFilesOrder"]),
     ...mapActions("roles", ["fetchAllUsers"]),
     showNotification(message, type = 'success') {
       this.snackbar.message = message;
@@ -455,6 +460,20 @@ export default {
       XLSX.writeFile(wb, 'AllFiles.xlsx');
       this.showNotification('Files downloaded successfully');
     },
+    async handleOrderChange(newOrder) {
+      try {
+        const filesWithNewOrder = newOrder.map((file, index) => ({
+          ...file,
+          order: index + 1
+        }));
+        await this.updateFilesOrder(filesWithNewOrder);
+        this.showNotification('New Order saved successfully');
+        await this.fetchFiles();
+      } catch (error) {
+        console.error('Error saving order:', error);
+        this.showNotification('Error saving order: ' + error.message, 'error');
+      }
+    }
   },
   async mounted() {
     if (!this.$store.getters['auth/isAuthenticated']) {
