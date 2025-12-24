@@ -1,9 +1,9 @@
 <template>
-  <div class="d-flex" style="min-height: 500px; width: 98%;">
-    <div style="width: 12%;">
+  <div class="d-flex" style="min-height: 500px; width: 98%">
+    <div style="width: 12%">
       <StepperComp ref="stepRef" />
     </div>
-    <div style="width: 88%; overflow-x: auto;">
+    <div style="width: 88%; overflow-x: auto">
       <div>
         <ExcelSheetHeader @save="handleSave" />
       </div>
@@ -32,16 +32,17 @@
 
 <script>
 import { mapGetters, mapActions } from "vuex";
-import GenericExcelSheet from "@/components/common/GenericExcelSheet.vue";
+import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
 import ExcelSheetHeader from "./ExcelSheetHeader.vue";
 import StepperComp from "./StepperComp.vue";
-import { useExcelColumns } from "../Excel/excelColumn/useExcelColumns"
+import { useExcelColumns } from "../Excel/excelColumn/useExcelColumns";
 
 export default {
   name: "ExcelView",
   components: { GenericExcelSheet, ExcelSheetHeader, StepperComp },
   setup() {
-    const { getColumnsForStep, getEditorRef, getTypeForStep } = useExcelColumns();
+    const { getColumnsForStep, getEditorRef, getTypeForStep } =
+      useExcelColumns();
     return { getColumnsForStep, getEditorRef, getTypeForStep };
   },
   data() {
@@ -51,7 +52,13 @@ export default {
     };
   },
   computed: {
-    ...mapGetters("excel", ["getCurrentStepData", "getSteps", "getExcelSubTab", "getSelectedRows", "getCustomData"]),
+    ...mapGetters("excel", [
+      "getCurrentStepData",
+      "getSteps",
+      "getExcelSubTab",
+      "getSelectedRows",
+      "getCustomData",
+    ]),
     currentStepData() {
       return this.getCurrentStepData;
     },
@@ -62,7 +69,9 @@ export default {
       return this.getExcelSubTab;
     },
     currentEditorRef() {
-      const activeStep = this.$refs.stepRef ? this.$refs.stepRef.activeStep : this.excelSubTab;
+      const activeStep = this.$refs.stepRef
+        ? this.$refs.stepRef.activeStep
+        : this.excelSubTab;
       return this.$refs[`customEditor${activeStep}`];
     },
   },
@@ -78,15 +87,23 @@ export default {
     },
   },
   methods: {
-    ...mapActions("excel", ["setExcelSubTab", "setSelectedRows", "setCustomData", "setCustomColumns"]),
+    ...mapActions("excel", [
+      "setExcelSubTab",
+      "setSelectedRows",
+      "setCustomData",
+      "setCustomColumns",
+    ]),
     debounceSave() {
       if (this.saveTimeout) clearTimeout(this.saveTimeout);
       this.saveTimeout = setTimeout(() => {
         try {
           const data = this.currentStepData[this.excelSubTab] || [];
           const newCustomData = [...this.getCustomData];
-          if (JSON.stringify(newCustomData[this.excelSubTab]) !== JSON.stringify(data)) {
-            newCustomData[this.excelSubTab] = data.map(row => ({
+          if (
+            JSON.stringify(newCustomData[this.excelSubTab]) !==
+            JSON.stringify(data)
+          ) {
+            newCustomData[this.excelSubTab] = data.map((row) => ({
               ...row,
               _rowKey: row._rowKey || String(Date.now() + Math.random()),
             }));
@@ -116,10 +133,13 @@ export default {
             .filter((index) => index >= 0 && index < currentData.length)
             .map((index) => ({
               ...currentData[index],
-              _rowKey: currentData[index]._rowKey || String(Date.now() + Math.random()),
+              _rowKey:
+                currentData[index]._rowKey ||
+                String(Date.now() + Math.random()),
             }));
           this.setSelectedRows(newSelectedRows);
-          this.lastSelectedIndex = selected.length > 0 ? selected[selected.length - 1] : null;
+          this.lastSelectedIndex =
+            selected.length > 0 ? selected[selected.length - 1] : null;
         }
       } catch (error) {
         console.error("Failed to handle row selection:", error);
@@ -131,7 +151,7 @@ export default {
     handleDataUpdate(index, newData) {
       try {
         const newCustomData = [...this.getCustomData];
-        newCustomData[index] = newData.map(row => ({
+        newCustomData[index] = newData.map((row) => ({
           ...row,
           _rowKey: row._rowKey || String(Date.now() + Math.random()),
         }));

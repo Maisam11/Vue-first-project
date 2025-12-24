@@ -101,8 +101,8 @@ export default {
       }
       console.log('fetchFiles response:', filesResponse.length, 'files');
       filesResponse.sort((a, b) => {
-        const orderA = a.order || 9999;
-        const orderB = b.order || 9999;
+        const orderA = a.menu_order || 9999;
+        const orderB = b.menu_order || 9999;
         return orderA - orderB;
       });
 
@@ -134,7 +134,7 @@ export default {
       filesWithNewOrder.forEach((file, index) => {
         const fileRef = doc(db, collectionPath, file.id);
         batch.update(fileRef, { 
-          order: index + 1,
+          menu_order: index + 1,
           updatedAt: new Date().toISOString() 
         });
       });
@@ -167,7 +167,7 @@ export default {
         viewers: file.viewers || [],
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
         currentVersion: 1,
-        order: currentFilesCount + 1,
+        menu_order: currentFilesCount + 1,
         lastSaved: new Date().toISOString()
       };
       console.log('addFile: Creating file with data:', fileData);
@@ -212,7 +212,7 @@ export default {
         viewers: file.viewers || [],
         sheetNames: file.sheets ? file.sheets.map(sheet => sheet.name) : [],
         currentVersion: file.currentVersion || 1,
-        order: file.order || 9999,
+        menu_order: file.menu_order || 9999,
         lastSaved: new Date().toISOString()
       };
       console.log('updateFile: Updating file with data:', fileData);
@@ -221,29 +221,15 @@ export default {
       await dispatch('firebase/update', { collectionPath, id: file.id, data: fileData }, { root: true });
 
       if (file.sheets && file.sheets.length > 0) {
-      const currentSheets = await dispatch('getSheets', { fileId: file.id });
-      const currentSheetNames = currentSheets.map(sheet => sheet.id);
-      const newSheetNames = file.sheets.map(sheet => sheet.name);
-      
-      for (const sheetName of currentSheetNames) {
-        if (!newSheetNames.includes(sheetName)) {
-          console.log('Deleting removed sheet:', sheetName);
-        await dispatch('deleteSheet', { fileId: file.id, sheetName });
-        }
-      }
         for (const sheet of file.sheets) {
           const sheetData = {
+          name: sheet.name,
             createdAt: sheet.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            menu_order: sheet.menu_order || 9999,
             data: sheet.data || []
           };
           await dispatch('setSheet', { fileId: file.id, sheetName: sheet.name, data: sheetData });
-        }
-    } else {
-      const currentSheets = await dispatch('getSheets', { fileId: file.id });
-      for (const sheet of currentSheets) {
-        console.log('Deleting all sheets:', sheet.id);
-        await dispatch('deleteSheet', { fileId: file.id, sheetName: sheet.id });
       }
     }
     const updatedFile = { ...file, ...fileData };
