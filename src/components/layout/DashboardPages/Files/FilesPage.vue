@@ -161,6 +161,11 @@
           </div>
         </div>
       </template>
+  <template v-slot:column-type="{ item }">
+    <span>
+      {{ item.type === 'excel' ? 'Excel' : 'Document' }}
+    </span>
+  </template>
     </GenericDataTable>
     <v-card>
       <v-card-text class="pa-3">
@@ -253,6 +258,12 @@ export default {
           value: "name",
           width: "200px",
           class: "font-weight-bold",
+          filterable: true,
+        },
+        {
+          text: "Type",
+          value: "type",
+          width: "120px",
           filterable: true,
         },
         {

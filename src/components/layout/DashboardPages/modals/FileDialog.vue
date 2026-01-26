@@ -13,6 +13,12 @@
           ref="fileNameInput"
         ></v-text-field>
         <v-select
+          v-model="localItem.type"
+          :items="fileTypes"
+          label="File Type" dense
+          :disabled="!!editedItem?.type"
+        ></v-select>
+        <v-select
           v-if="canShare"
           v-model="selectedUsers"
           :items="availableUsers"
@@ -58,7 +64,7 @@
           color="blue darken-1" 
           text 
           @click="saveFile" 
-          :disabled="!localItem.name"
+          :disabled="!localItem.name || !localItem.type"
         >Save</v-btn>
       </v-card-actions>
     </v-card>
@@ -114,11 +120,13 @@ export default {
             ...this.editedItem, 
             sheets: this.editedItem.sheets || [], 
             editors: this.editedItem.editors || [],
+            type: this.editedItem.type || '',
             viewers: this.editedItem.viewers || [] 
           }
         : {
             id: this.generateRandomId(),
             name: "",
+            type: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             addedBy: this.$store.getters['auth/currentUser']?.username || 'Unknown',
@@ -132,6 +140,10 @@ export default {
       accessLevels: [
         { text: 'View Only', value: 'view' },
         { text: 'Edit Only', value: 'edit' }
+      ],
+      fileTypes: [
+        { text: 'Excel File', value: 'excel' },
+        { text: 'Document File', value: 'document' }
       ],
     };
   },

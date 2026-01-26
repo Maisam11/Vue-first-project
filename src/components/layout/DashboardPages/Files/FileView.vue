@@ -11,6 +11,7 @@
             Last saved: {{ formatTime(localFile.lastSaved) }}
           </span>
           <GenericButton
+            v-if="localFile.type === 'excel'"
             icon="mdi-history"
             @click="openHistoryDialog"
             title="View History"
@@ -27,6 +28,8 @@
               <ul style="list-style: none; margin-left: -1.2rem">
                 <li><strong>File ID:</strong> {{ localFile.id }}</li>
                 <li>
+                  <strong>Type:</strong> {{ localFile.type === 'excel' ? 'Excel File' : 'Document File' }}</li>
+                <li v-if="localFile.type === 'excel'">
                   <strong>Current Version:</strong>
                   {{ localFile.currentVersion || 1 }}
                 </li>
@@ -42,7 +45,7 @@
             <v-col
               cols="12"
               md="6"
-              v-if="localFile.sheets && localFile.sheets.length"
+              v-if="localFile.type === 'excel' && localFile.sheets && localFile.sheets.length"
             >
               <ul style="list-style: none; margin-left: -1.2rem">
                 <li>
@@ -66,6 +69,7 @@
               </ul>
             </v-col>
           </v-row>
+          <template v-if="localFile.type === 'excel'">
           <h3>Sheets</h3>
           <div class="d-flex justify-content-between">
             <div class="d-flex mb-4" v-if="canEdit">
@@ -188,9 +192,31 @@
               />
             </v-tab-item>
           </v-tabs-items>
+          </template>
+          <template v-else-if="localFile.type === 'document'">
+            <div class="d-flex justify-content-end">
+              <v-card-actions>
+                <GenericButton
+                  color="primary"
+                  @click="saveDocument"
+                  v-if="canEdit">
+                  Save Document
+                </GenericButton>
+                <GenericButton @click="$router.push('/UserDashboard/Files')">
+                  Back
+                </GenericButton>
+              </v-card-actions>
+            </div>
+            <DocumentEditor
+              :class="{ readonly: !canEdit }"
+              v-model="localFile.content"
+              :readonly="!canEdit"
+              @input="handleDocumentChange" />
+          </template>
         </v-card-text>
       </v-card>
       <FileHistoryDialog
+        v-if="localFile.type === 'excel'"
         v-model="historyDialog"
         :file="localFile"
         @reverted="handleHistoryReverted"
@@ -212,6 +238,7 @@
 <script>
 import GenericButton from "../../../common/GenericButton.vue";
 import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
+import DocumentEditor from "../../../common/DocumentEditor.vue";
 import DeleteDialog from "../modals/DeleteDialog.vue";
 import FileHistoryDialog from "../modals/FileHistoryDialog.vue";
 import { mapActions, mapGetters } from "vuex";
@@ -221,6 +248,7 @@ export default {
   name: "FileView",
   components: {
     GenericExcelSheet,
+    DocumentEditor,
     DeleteDialog,
     GenericButton,
     FileHistoryDialog,
@@ -293,6 +321,23 @@ export default {
       const date = new Date(timestamp);
       return date.toLocaleTimeString();
     },
+    handleDocumentChange() {
+      if (!this.canEdit) return;
+      this.hasUnsavedChanges = true;
+    },
+    async saveDocument() {
+      if (!this.canEdit) return;
+      try {
+        this.localFile.updatedAt = new Date().toISOString();
+        this.localFile.lastSaved = new Date().toISOString();
+        await this.updateFile(this.localFile);
+        this.hasUnsavedChanges = false;
+        this.$toast.success('Document saved successfully');
+      } catch (error) {
+        console.error('Error saving document:', error);
+        this.$toast.error('Error saving document: ' + error.message);
+      }
+    },
     handleUserChange() {
       this.hasUnsavedChanges = true;
       this.hasRealChanges = true;
@@ -305,7 +350,7 @@ export default {
       await this.saveSheetOrder();
     },
     async saveSheetOrder() {
-      if (!this.canEdit) return;
+      if (!this.canEdit || this.localFile.type !== 'excel') return;
       try {
         this.localFile.sheets.forEach((sheet, index) => {
           sheet.menu_order = index + 1;
@@ -317,7 +362,7 @@ export default {
       }
     },
     addNewSheet() {
-      if (!this.canEdit) return;
+      if (!this.canEdit || this.localFile.type !== 'excel') return;
       const sheets = this.localFile.sheets || [];
       const sheetsLength = sheets.length;
       const newSheetName = `Sheet ${sheetsLength + 1}`;
@@ -334,7 +379,7 @@ export default {
       this.handleUserChange();
     },
     handleSheetDataUpdate(index, newData) {
-      if (!this.canEdit) return;
+      if (!this.canEdit || this.localFile.type !== 'excel') return;
       console.log("Sheet data updated - processing:", newData);
       const sheet = this.localFile.sheets[index];
       if (sheet) {
@@ -349,6 +394,7 @@ export default {
       }
     },
     startNewSession() {
+      if (this.localFile.type !== 'excel') return;
       if (
         this.localFile?.sheets &&
         this.localFile.sheets[this.activeSheetTab]
@@ -366,10 +412,14 @@ export default {
       }
     },
     async manualSave() {
+      if (this.localFile.type === 'excel') {
       await this.performFinalSave(true);
+      } else {
+        await this.saveDocument();
+      }
     },
     async performFinalSave(showNotification = false) {
-      if (!this.canEdit || this.isSavingFinalVersion) return;
+      if (!this.canEdit || this.isSavingFinalVersion || this.localFile.type !== 'excel') return;
       try {
         this.isSavingFinalVersion = true;
 
@@ -420,7 +470,7 @@ export default {
       }
     },
     addRow() {
-      if (!this.canEdit) return;
+      if (!this.canEdit || this.localFile.type !== 'excel') return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -437,7 +487,7 @@ export default {
       this.handleUserChange();
     },
     addRowAbove() {
-      if (!this.canEdit || this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0 || this.localFile.type !== 'excel') return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -462,7 +512,7 @@ export default {
       this.handleUserChange();
     },
     addRowBelow() {
-      if (!this.canEdit || this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0 || this.localFile.type !== 'excel') return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const newRow = {
@@ -487,6 +537,7 @@ export default {
       this.handleUserChange();
     },
     handleRowSelection(index, selected) {
+      if (this.localFile.type !== 'excel') return;
       const sheet = this.localFile.sheets[index];
       const currentData = sheet.data || [];
       this.selectedRows = selected
@@ -494,7 +545,7 @@ export default {
         .map((idx) => currentData[idx]._rowKey);
     },
     deleteSelectedRows() {
-      if (!this.canEdit || this.selectedRows.length === 0) return;
+      if (!this.canEdit || this.selectedRows.length === 0 || this.localFile.type !== 'excel') return;
       const sheet = this.localFile.sheets[this.activeSheetTab];
       if (!sheet) return;
       const currentData = sheet.data || [];
@@ -515,7 +566,7 @@ export default {
       this.dialogDeleteSheet = true;
     },
     async deleteSheetConfirm() {
-      if (!this.canEdit) return;
+      if (!this.canEdit || this.localFile.type !== 'excel') return;
       try {
         console.log("Deleting sheet at index:", this.sheetToDelete);
         const sheetToDelete = this.localFile.sheets[this.sheetToDelete];
@@ -586,7 +637,9 @@ export default {
       this.newSheetName = "";
     },
     openHistoryDialog() {
+      if (this.localFile.type === 'excel') {
       this.historyDialog = true;
+      }
     },
     async handleHistoryReverted() {
       await this.loadFileData();
@@ -601,7 +654,7 @@ export default {
       try {
         const fileData = await this.getFileById(this.$route.params.id);
         if (fileData) {
-          if (fileData.sheets) {
+          if (fileData.sheets && fileData.type === 'excel') {
             fileData.sheets.sort((a, b) => {
               const orderA = a.menu_order || 9999;
               const orderB = b.menu_order || 9999;
@@ -642,7 +695,11 @@ export default {
       !this.isSavingFinalVersion
     ) {
       console.log("Component destroying - performing final save");
+      if (this.localFile.type === 'excel') {
       this.performFinalSave(false);
+      } else if (this.localFile.type === 'document') {
+        this.saveDocument();
+      }
     }
   },
 };

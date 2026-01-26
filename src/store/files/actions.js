@@ -159,6 +159,7 @@ export default {
     try {
       const fileData = {
         name: file.name,
+        type: file.type || 'excel',
         createdAt: file.createdAt || new Date().toISOString(),
         updatedAt: file.updatedAt || new Date().toISOString(),
         addedBy: file.addedBy || currentUser?.username || 'Unknown',
@@ -204,6 +205,7 @@ export default {
       const currentUser = rootGetters['auth/currentUser'];
       const fileData = {
         name: file.name,
+        type: file.type || 'excel',
         createdAt: file.createdAt,
         updatedAt: new Date().toISOString(),
         addedBy: file.addedBy,
