@@ -21,6 +21,7 @@ import Setting2File from "../components/layout/DashboardPages/practicePages/Sett
 import MorePage from "../components/layout/DashboardPages/practicePages/More.vue";
 import FilesPage from "../components/layout/DashboardPages/Files/FilesPage.vue";
 import FileView from "../components/layout/DashboardPages/Files/FileView.vue";
+import PracticePage from "../components/layout/sections/PracticePage.vue"
 import LoginComp from '../components/layout/DashboardPages/Files/LoginComp.vue';
 import store from '../store';
 
@@ -45,6 +46,7 @@ const router = new Router({
         { path: "FAQComp", component: FAQComp },
         { path: "BlogComp", component: BlogComp },
         { path: "VueStepper", component: VueStepper },
+        { path: "PracticePage", component: PracticePage},
         { path: "login", component: LoginComp, name: 'login' },
       ],
     },

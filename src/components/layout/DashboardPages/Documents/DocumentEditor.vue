@@ -23,16 +23,26 @@
 import VueDocumentEditor from 'vue-document-editor'
 import FileToolbarMenu from 'vue-file-toolbar-menu'
 import mammoth from 'mammoth'
+
 export default {
-    name: 'DocumentEditor',
-    components: {
-        VueDocumentEditor,
-        FileToolbarMenu
+  name: 'DocumentEditor',
+  components: {
+    VueDocumentEditor,
+    FileToolbarMenu
+  },
+  props: {
+    value: {
+      type: Array,
+      default: () => ['<p><br></p>']
     },
-    data() {
-        return {
-            content: ['<p><br></p>'],
-            toolbarContent: [
+    readonly: {
+      type: Boolean,
+      default: false
+    }
+  },
+  data() {
+    return {
+      toolbarContent: [
                 { icon: 'undo', title: 'Undo', click: () => this.exec('undo') },
                 { icon: 'redo', title: 'Redo', click: () => this.exec('redo') },
                 { is: "separator" },
@@ -96,68 +106,82 @@ export default {
             ]
         }
     },
-    methods: {
-        exec(command, value = null) {
-            document.execCommand(command, false, value)
-            this.$nextTick(() => {
-            const editable = this.$el.querySelector('.vue-document-editor-editable')
-            if (editable) editable.focus()
-            })
-        },
-        async handleImport(e) {
-            const file = e.target.files[0]
-            e.target.value = ''
-            if (!file) return
-            const extension = file.name.split('.').pop().toLowerCase()
-            if (extension === 'doc') {
-                await this.importDoc(file)
-            } else if (extension === 'docx') {
-                await this.importDocx(file)
-            } else {
-                alert('Unsupported file type')
-            }
-        },
-        async importDoc(file) {
-            const html = await file.text()
-            const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-            this.content = [match ? match[1] : '<p><br></p>']
-        },
-        async importDocx(file) {
-            try {
-                const arrayBuffer = await file.arrayBuffer()
-                const result = await mammoth.convertToHtml({ arrayBuffer })
-                this.content = [result.value || '<p><br></p>']
-            } catch (err) {
-                console.error(err)
-                alert('Failed to import DOCX file')
-            }
-        },
-        downloadHtml() {
-            const html = `<!DOCTYPE html>
-                <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <style>
-                            body {
-                                font-size: 12pt;
-                            }
-                            p {
-                                margin: 0 0 0.3cm 0;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        ${this.content.join('\n')}
-                    </body>
-                </html>`
-            const blob = new Blob([html], { type: 'text/html' })
-            const link = document.createElement('a')
-            link.href = URL.createObjectURL(blob)
-            link.download = 'document.doc'
-            link.click()
-            URL.revokeObjectURL(link.href)
+    computed: {
+    content: {
+      get() {
+        if (!this.value || !Array.isArray(this.value)) {
+          return ['<p><br></p>'];
         }
+        return this.value;
+      },
+      set(newValue) {
+        const contentToEmit = Array.isArray(newValue) ? newValue : [newValue];
+        this.$emit('input', contentToEmit);
+      }
     }
+  },
+    methods: {
+    exec(command, value = null) {
+      document.execCommand(command, false, value)
+      this.$nextTick(() => {
+        const editable = this.$el.querySelector('.vue-document-editor-editable')
+        if (editable) editable.focus()
+      })
+    },
+    async handleImport(e) {
+      const file = e.target.files[0]
+      e.target.value = ''
+      if (!file) return
+      const extension = file.name.split('.').pop().toLowerCase()
+      if (extension === 'doc') {
+        await this.importDoc(file)
+      } else if (extension === 'docx') {
+        await this.importDocx(file)
+      } else {
+        alert('Unsupported file type')
+      }
+    },
+    async importDoc(file) {
+      const html = await file.text()
+      const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+      this.content = [match ? match[1] : '<p><br></p>']
+    },
+    async importDocx(file) {
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.convertToHtml({ arrayBuffer })
+        this.content = [result.value || '<p><br></p>']
+      } catch (err) {
+        console.error(err)
+        alert('Failed to import DOCX file')
+      }
+    },
+    downloadHtml() {
+      const html = `<!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body {
+                font-size: 12pt;
+              }
+              p {
+                margin: 0 0 0.3cm 0;
+              }
+            </style>
+          </head>
+          <body>
+            ${this.content.join('\n')}
+          </body>
+        </html>`
+      const blob = new Blob([html], { type: 'text/html' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = 'document.doc'
+      link.click()
+      URL.revokeObjectURL(link.href)
+    },
+  }
 }
 </script>
 <style scoped>

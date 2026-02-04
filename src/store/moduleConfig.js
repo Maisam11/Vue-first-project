@@ -6,7 +6,9 @@ export const MODULE_NAMES = {
   USERS: createModuleId(CURRENT_ACCOUNT_ID, 'users'),
   FILES: createModuleId(CURRENT_ACCOUNT_ID, 'files'),
   FILE_HISTORIES: createModuleId(CURRENT_ACCOUNT_ID, 'file_histories'),
-  SHEETS: 'sheets'
+  SHEETS: 'sheets',
+  DOCUMENTS: createModuleId(CURRENT_ACCOUNT_ID, 'documents'),
+  DOCUMENT_HISTORIES: createModuleId(CURRENT_ACCOUNT_ID, 'document_histories'),
 };
 export { CURRENT_ACCOUNT_ID, createModuleId };
 export default {

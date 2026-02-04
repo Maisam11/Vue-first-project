@@ -11,7 +11,6 @@
             Last saved: {{ formatTime(localFile.lastSaved) }}
           </span>
           <GenericButton
-            v-if="localFile.type === 'excel'"
             icon="mdi-history"
             @click="openHistoryDialog"
             title="View History"
@@ -29,7 +28,7 @@
                 <li><strong>File ID:</strong> {{ localFile.id }}</li>
                 <li>
                   <strong>Type:</strong> {{ localFile.type === 'excel' ? 'Excel File' : 'Document File' }}</li>
-                <li v-if="localFile.type === 'excel'">
+                <li>
                   <strong>Current Version:</strong>
                   {{ localFile.currentVersion || 1 }}
                 </li>
@@ -221,6 +220,12 @@
         :file="localFile"
         @reverted="handleHistoryReverted"
       />
+      <DocumentHistoryDialog
+        v-if="localFile.type === 'document'"
+        v-model="historyDialog"
+        :file="localFile"
+        @reverted="handleDocumentHistoryReverted"
+      />
       <DeleteDialog
         :dialog="dialogDeleteSheet"
         @confirm="deleteSheetConfirm"
@@ -238,9 +243,10 @@
 <script>
 import GenericButton from "../../../common/GenericButton.vue";
 import GenericExcelSheet from "../../../common/GenericExcelSheet.vue";
-import DocumentEditor from "../../../common/DocumentEditor.vue";
+import DocumentEditor from "../Documents/DocumentEditor.vue";
 import DeleteDialog from "../modals/DeleteDialog.vue";
 import FileHistoryDialog from "../modals/FileHistoryDialog.vue";
+import DocumentHistoryDialog from "../modals/DocumentHistoryDialog.vue";
 import { mapActions, mapGetters } from "vuex";
 import draggable from "vuedraggable";
 
@@ -252,6 +258,7 @@ export default {
     DeleteDialog,
     GenericButton,
     FileHistoryDialog,
+    DocumentHistoryDialog,
     draggable,
   },
   data() {
@@ -281,6 +288,8 @@ export default {
   computed: {
     ...mapGetters("auth", ["currentUser"]),
     ...mapGetters("roles", ["getCurrentUserRole"]),
+    ...mapGetters("document", ["getDocumentById"]),
+    ...mapGetters("files", ["getFileById"]),
     isAdmin() {
       return this.getCurrentUserRole === "admin";
     },
@@ -307,7 +316,6 @@ export default {
   methods: {
     ...mapActions("files", [
       "updateFile",
-      "getFileById",
       "createFileHistory",
       "deleteSheet",
     ]),
@@ -324,13 +332,30 @@ export default {
     handleDocumentChange() {
       if (!this.canEdit) return;
       this.hasUnsavedChanges = true;
+      this.hasRealChanges = true;
     },
     async saveDocument() {
       if (!this.canEdit) return;
       try {
-        this.localFile.updatedAt = new Date().toISOString();
-        this.localFile.lastSaved = new Date().toISOString();
-        await this.updateFile(this.localFile);
+        const contentToSave = this.localFile.content || ['<p><br></p>'];
+        const newVersion = (this.localFile.currentVersion || 0) + 1;
+        await this.$store.dispatch('document/createDocumentHistory', {
+          documentId: this.localFile.id,
+          data: { content: contentToSave },
+          version: newVersion,
+          changeType: "updated",
+          changedBy: this.currentUser?.username || "Unknown"
+        });
+        const documentToUpdate = {
+          ...this.localFile,
+          content: contentToSave,
+          updatedAt: new Date().toISOString(),
+          lastSaved: new Date().toISOString(),
+          currentVersion: newVersion,
+          activeHistoryVersion: null
+        };
+        await this.$store.dispatch('document/updateDocument', documentToUpdate);
+        this.localFile = documentToUpdate;
         this.hasUnsavedChanges = false;
         this.$toast.success('Document saved successfully');
       } catch (error) {
@@ -341,7 +366,7 @@ export default {
     handleUserChange() {
       this.hasUnsavedChanges = true;
       this.hasRealChanges = true;
-      if (this.isNewSession) {
+      if (this.isNewSession && this.localFile.type === 'excel') {
         this.startNewSession();
       }
     },
@@ -637,9 +662,7 @@ export default {
       this.newSheetName = "";
     },
     openHistoryDialog() {
-      if (this.localFile.type === 'excel') {
       this.historyDialog = true;
-      }
     },
     async handleHistoryReverted() {
       await this.loadFileData();
@@ -650,9 +673,30 @@ export default {
       this.hasRealChanges = false;
       this.$toast.success("File reverted successfully");
     },
+    async handleDocumentHistoryReverted() {
+      await this.loadFileData();
+      this.historyDialog = false;
+      this.hasUnsavedChanges = false;
+      this.isNewSession = true;
+      this.hasRealChanges = false;
+      this.$toast.success("Document reverted successfully");
+    },
     async loadFileData() {
       try {
-        const fileData = await this.getFileById(this.$route.params.id);
+    const fileId = this.$route.params.id;
+    let fileData = null;
+    try {
+      fileData = await this.$store.dispatch('document/getDocumentById', fileId);
+    } catch (docError) {
+      try {
+        fileData = await this.getFileById(fileId);
+      } catch (excelError) {
+        console.log("File not found in Firebase");
+      }
+    }
+    if (!fileData) {
+      fileData = this.getDocumentById(fileId) || this.getFileById(fileId);
+    }
         if (fileData) {
           if (fileData.sheets && fileData.type === 'excel') {
             fileData.sheets.sort((a, b) => {
@@ -660,6 +704,11 @@ export default {
               const orderB = b.menu_order || 9999;
               return orderA - orderB;
             });
+          }
+      if (fileData.type === 'document') {
+        if (!fileData.content || !Array.isArray(fileData.content)) {
+          fileData.content = ['<p><br></p>'];
+        }
           }
           this.localFile = fileData;
           this.isNewSession = true;
@@ -687,18 +736,23 @@ export default {
     this.loading = true;
     await this.loadFileData();
     this.loading = false;
+  if (this.localFile && this.localFile.type === 'document') {
+    this.$nextTick(() => {
+      if (!this.localFile.content || !Array.isArray(this.localFile.content)) {
+        this.localFile.content = ['<p><br></p>'];
+      }
+    });
+  }
   },
   beforeDestroy() {
     if (
       this.hasUnsavedChanges &&
       this.hasRealChanges &&
       !this.isSavingFinalVersion
-    ) {
+       && this.localFile) {
       console.log("Component destroying - performing final save");
       if (this.localFile.type === 'excel') {
       this.performFinalSave(false);
-      } else if (this.localFile.type === 'document') {
-        this.saveDocument();
       }
     }
   },

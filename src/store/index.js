@@ -7,6 +7,7 @@ import usersModule from './users';
 import excelModule from './excel';
 import authModule from './auth';
 import rolesModule from './roles';
+import documentModule from './document';
 
 Vue.use(Vuex);
 
@@ -18,11 +19,12 @@ export default new Vuex.Store({
     excel: excelModule,
     auth: authModule,
     roles: rolesModule,
+    document: documentModule,
   },
   plugins: [
     createPersistedState({
       key: 'my-app',
-      paths: ['users', 'excel', 'files', 'auth'],
+      paths: ['users', 'excel', 'files', 'auth', 'document.documents', 'document.documentHistories' ],
     }),
   ],
 });

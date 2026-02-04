@@ -9,6 +9,7 @@
 
       <v-toolbar-items class="custom-hide-menu">
         <v-btn text to="/">Home</v-btn>
+        <v-btn text to="/PracticePage">PracticePage</v-btn>
         <v-btn text to="/RepairComp">Repair</v-btn>
         <v-btn text to="/WorksComp">Works</v-btn>
         <v-btn text to="/AboutComp">About</v-btn>
@@ -17,7 +18,6 @@
         <v-btn text to="/FeedbackComp">Feedback</v-btn>
         <v-btn text to="/FAQComp">FAQ</v-btn>
         <v-btn text to="/BlogComp">Blog</v-btn>
-        <!-- <v-btn text to="/UserPage">Users</v-btn> -->
         <v-btn text to="/VueStepper">Stepper</v-btn>
         <v-btn text to="/UserDashboard">View Dashboard</v-btn>
       </v-toolbar-items>
@@ -28,6 +28,7 @@
     <v-navigation-drawer v-model="drawer" temporary right fixed>
       <v-list>
         <v-list-item to="/">Home</v-list-item>
+        <v-list-item to="/PracticePage">PracticePage</v-list-item>
         <v-list-item to="/RepairComp">Repair</v-list-item>
         <v-list-item to="/WorksComp">How It Works</v-list-item>
         <v-list-item to="/AboutComp">About Us</v-list-item>
@@ -36,7 +37,6 @@
         <v-list-item to="/FeedbackComp">Feedback</v-list-item>
         <v-list-item to="/FAQComp">FAQ</v-list-item>
         <v-list-item to="/BlogComp">Blog</v-list-item>
-        <!-- <v-list-item to="/UserPage">Users</v-list-item> -->
         <v-list-item to="/VueStepper">Stepper</v-list-item>
         <v-list-item to="/UserDashboard">View Dashboard</v-list-item>
       </v-list>

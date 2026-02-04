@@ -107,6 +107,7 @@ export default {
       });
 
       const filesWithSheets = await Promise.all(filesResponse.map(async (file) => {
+        if (file.type === 'excel') {
         try {
           const sheets = await dispatch('getSheets', { fileId: file.id });
           return {
@@ -116,6 +117,9 @@ export default {
         } catch (sheetError) {
           console.error(`Error fetching sheets for file ${file.id}:`, sheetError);
           return { ...file, sheets: [] };
+          }
+        } else {
+          return file;
         }
       }));
       commit('SET_FILES', filesWithSheets);
@@ -281,9 +285,11 @@ export default {
         throw new Error('You do not have permission to access this file');
       }
       console.log('getFileById response:', fileDataResponse);
+      if (fileDataResponse.type === 'excel') {
       const sheets = await dispatch('getSheets', { fileId: id });
-      const fileWithSheets = { ...fileDataResponse, sheets: sheets.map(s => ({ name: s.id, ...s })) };
-      return fileWithSheets;
+        return { ...fileDataResponse, sheets: sheets.map(s => ({ name: s.id, ...s })) };
+      }
+      return fileDataResponse;
     } catch (error) {
       console.error('getFileById: Error:', error.code, error.message);
       console.error('getFileById: Error details:', error);
